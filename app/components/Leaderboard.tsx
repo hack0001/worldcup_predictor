@@ -1,12 +1,19 @@
 "use client";
-import { Player } from "@/app/data/types";
-import { AdminState } from "@/app/data/types";
+import { Player, AdminState } from "@/app/data/types";
 import { calculatePlayerPoints } from "@/lib/storage";
+import { SQUADS } from "@/app/data/worldcup";
 
 interface Props {
   players: Player[];
   adminState: AdminState;
   currentPlayerId: string;
+}
+
+function getPlayerCountryFlag(playerName: string): string {
+  for (const [, squad] of Object.entries(SQUADS)) {
+    if (squad.players.includes(playerName)) return squad.flag;
+  }
+  return "";
 }
 
 export default function Leaderboard({ players, adminState, currentPlayerId }: Props) {
@@ -15,80 +22,71 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
     .sort((a, b) => b.points - a.points);
 
   const medals = ["🥇", "🥈", "🥉"];
+  const podiumColors = ["#f59e0b", "#94a3b8", "#c97c47"];
 
   return (
     <div>
-      <div className="card" style={{ padding: "16px 20px", marginBottom: "24px", borderColor: "rgba(245,197,24,0.4)" }}>
-        <p style={{ fontSize: "13px", color: "rgba(248,244,232,0.6)", lineHeight: 1.5 }}>
-          Points are awarded once the admin enters actual results. <strong style={{ color: "var(--gold)" }}>Exact score = 10pts</strong>, <strong style={{ color: "var(--cream)" }}>Correct result = 6pts</strong>, Golden Boot = +15pts, Top Assist = +10pts.
-        </p>
+      {/* Scoring info strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "20px" }}>
+        {[
+          { label: "Exact Score", pts: "+10", color: "var(--green)" },
+          { label: "Correct Result", pts: "+6", color: "var(--blue)" },
+          { label: "Golden Boot", pts: "+15", color: "var(--gold)" },
+          { label: "Top Assist", pts: "+10", color: "var(--purple)" },
+        ].map(({ label, pts, color }) => (
+          <div key={label} className="card" style={{ padding: "12px", textAlign: "center" }}>
+            <div style={{ fontSize: "18px", fontWeight: 800, color }}>{pts}</div>
+            <div style={{ fontSize: "11px", color: "var(--text-2)", marginTop: "2px", fontWeight: 500 }}>{label}</div>
+          </div>
+        ))}
       </div>
 
       {ranked.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "rgba(248,244,232,0.3)" }}>
-          <p style={{ fontSize: "48px", marginBottom: "12px" }}>👥</p>
-          <p>No players have joined yet. Share the link!</p>
+        <div className="card" style={{ padding: "48px", textAlign: "center" }}>
+          <div style={{ fontSize: "40px", marginBottom: "12px" }}>👥</div>
+          <p style={{ fontWeight: 600, marginBottom: "4px" }}>No players yet</p>
+          <p style={{ fontSize: "13px", color: "var(--text-2)" }}>Share the link with your mates to get started</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gap: "10px" }}>
+        <div style={{ display: "grid", gap: "8px" }}>
           {ranked.map(({ player, points }, idx) => {
             const isMe = player.id === currentPlayerId;
+            const isTop3 = idx < 3;
+            const scorerFlag = player.topScorer ? getPlayerCountryFlag(player.topScorer) : "";
+            const assistFlag = player.topAssist ? getPlayerCountryFlag(player.topAssist) : "";
             return (
-              <div
-                key={player.id}
-                className="card"
-                style={{
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
-                  borderColor: isMe ? "var(--gold)" : undefined,
-                  background: isMe ? "rgba(245,197,24,0.05)" : undefined,
-                  transform: idx === 0 ? "scale(1.01)" : undefined,
-                }}
-              >
-                <div style={{
-                  fontSize: idx < 3 ? "28px" : "18px",
-                  width: "40px",
-                  textAlign: "center",
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  color: "rgba(248,244,232,0.3)",
-                }}>
-                  {idx < 3 ? medals[idx] : `#${idx + 1}`}
+              <div key={player.id} className="card" style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", borderColor: isMe ? "var(--green)" : undefined, background: isMe ? "#f0fdf4" : undefined }}>
+                {/* Rank */}
+                <div style={{ width: "32px", textAlign: "center", flexShrink: 0 }}>
+                  {isTop3 ? (
+                    <span style={{ fontSize: "22px" }}>{medals[idx]}</span>
+                  ) : (
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-3)" }}>#{idx + 1}</span>
+                  )}
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "15px" }}>{player.name}</span>
-                    {isMe && (
-                      <span style={{
-                        background: "var(--gold)",
-                        color: "var(--dark)",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: "2px",
-                        letterSpacing: "0.05em",
-                      }}>YOU</span>
-                    )}
+                {/* Avatar */}
+                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: isTop3 ? podiumColors[idx] : "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 700, color: isTop3 ? "white" : "var(--text-2)", flexShrink: 0, border: `2px solid ${isTop3 ? podiumColors[idx] : "var(--border)"}` }}>
+                  {player.name.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: "14px" }}>{player.name}</span>
+                    {isMe && <span className="badge" style={{ background: "var(--green-light)", color: "var(--green)", fontSize: "10px" }}>YOU</span>}
                   </div>
-                  <p style={{ fontSize: "13px", color: "rgba(248,244,232,0.5)" }}>{player.teamName}</p>
-                  <div style={{ display: "flex", gap: "12px", marginTop: "4px", fontSize: "11px", color: "rgba(248,244,232,0.4)" }}>
-                    {player.topScorer && <span>⚽ {player.topScorer}</span>}
-                    {player.topAssist && <span>🎯 {player.topAssist}</span>}
+                  <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "1px" }}>{player.teamName}</p>
+                  <div style={{ display: "flex", gap: "10px", marginTop: "4px", fontSize: "11px", color: "var(--text-3)", flexWrap: "wrap" }}>
+                    {player.topScorer && <span>⚽ {scorerFlag} {player.topScorer}</span>}
+                    {player.topAssist && <span>🎯 {assistFlag} {player.topAssist}</span>}
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{
-                    fontFamily: "'Bebas Neue', sans-serif",
-                    fontSize: "32px",
-                    color: idx === 0 ? "var(--gold)" : "var(--cream)",
-                    lineHeight: 1,
-                  }}>
-                    {points}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "rgba(248,244,232,0.4)", letterSpacing: "0.05em" }}>PTS</div>
+                {/* Points */}
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: "26px", fontWeight: 800, color: isTop3 ? podiumColors[idx] : "var(--text)", lineHeight: 1 }}>{points}</div>
+                  <div style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>pts</div>
                 </div>
               </div>
             );
@@ -96,25 +94,15 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
         </div>
       )}
 
-      {/* Scoring guide */}
-      <div style={{ marginTop: "32px" }}>
-        <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "20px", marginBottom: "12px", color: "rgba(248,244,232,0.6)" }}>
-          Scoring Guide
-        </h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "8px" }}>
-          {[
-            { label: "Exact Score", pts: "+10", color: "var(--gold)" },
-            { label: "Correct Result", pts: "+6", color: "#7ec8a4" },
-            { label: "Golden Boot", pts: "+15", color: "#e8a838" },
-            { label: "Top Assist", pts: "+10", color: "#e8a838" },
-          ].map(({ label, pts, color }) => (
-            <div key={label} className="card" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "13px" }}>{label}</span>
-              <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "22px", color }}>{pts}</span>
-            </div>
-          ))}
+      {adminState.topScorer || adminState.topAssist ? (
+        <div className="card" style={{ padding: "16px 18px", marginTop: "20px", background: "#fffbeb", borderColor: "#fde68a" }}>
+          <p style={{ fontSize: "12px", fontWeight: 700, color: "#92400e", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tournament Awards — Confirmed</p>
+          <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+            {adminState.topScorer && <span style={{ fontSize: "13px" }}>⚽ Golden Boot: <strong>{adminState.topScorer}</strong></span>}
+            {adminState.topAssist && <span style={{ fontSize: "13px" }}>🎯 Top Assist: <strong>{adminState.topAssist}</strong></span>}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
