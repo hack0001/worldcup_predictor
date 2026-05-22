@@ -2,6 +2,7 @@
 import { Player } from "@/app/data/types";
 import { GROUPS, generateGroupMatches } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
+import Flag from "./Flag";
 
 interface Props {
   player: Player;
@@ -54,7 +55,9 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
               <span style={{ fontWeight: 700, fontSize: "14px" }}>Group {group}</span>
               <div style={{ display: "flex", gap: "6px", marginLeft: "4px", flexWrap: "wrap" }}>
                 {teams.map(t => (
-                  <span key={t.team} style={{ fontSize: "12px", color: "var(--text-3)" }}>{t.flag} {t.team}</span>
+                  <span key={t.team} style={{ fontSize: "12px", color: "var(--text-3)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <Flag country={t.team} size={14} /> {t.team}
+                  </span>
                 ))}
               </div>
               <span className="badge" style={{ background: groupFilled === matches.length ? "#dcfce7" : "var(--bg)", color: groupFilled === matches.length ? "var(--green)" : "var(--text-3)", border: "1px solid var(--border)", marginLeft: "auto" }}>
@@ -68,13 +71,13 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
                 const filled = pred?.home !== "" && pred?.away !== "" && pred?.home !== undefined;
                 return (
                   <div key={match.id} className="card" style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: "8px", borderColor: filled ? "#bbf7d0" : undefined }}>
-                    <span style={{ flex: 1, textAlign: "right", fontSize: "13px", fontWeight: 500 }}>{match.home.flag} {match.home.team}</span>
+                    <span style={{ flex: 1, textAlign: "right", fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}><Flag country={match.home.team} /> {match.home.team}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
                       <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={(e) => updateScore(match.id, "home", e.target.value)} disabled={readonly} />
                       <span style={{ color: "var(--text-3)", fontSize: "11px", fontWeight: 600 }}>—</span>
                       <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={(e) => updateScore(match.id, "away", e.target.value)} disabled={readonly} />
                     </div>
-                    <span style={{ flex: 1, fontSize: "13px", fontWeight: 500 }}>{match.away.flag} {match.away.team}</span>
+                    <span style={{ flex: 1, fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", gap: "6px" }}><Flag country={match.away.team} /> {match.away.team}</span>
                   </div>
                 );
               })}

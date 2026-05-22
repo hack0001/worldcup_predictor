@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { AdminState, PlayerStat } from "@/app/data/types";
 import { GROUPS, generateGroupMatches, KNOCKOUT_MATCHES, SQUADS } from "@/app/data/worldcup";
 import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat } from "@/lib/storage";
+import Flag from "./Flag";
 
 interface Props {
   adminState: AdminState;
@@ -163,18 +164,24 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                       <div style={{ width: "24px", height: "24px", background: "var(--green)", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "12px", fontWeight: 700 }}>{group}</div>
                       <span style={{ fontWeight: 700, fontSize: "13px" }}>Group {group}</span>
-                      <span style={{ fontSize: "12px", color: "var(--text-3)" }}>{teams.map(t => `${t.flag} ${t.team}`).join(" · ")}</span>
+                      <span style={{ fontSize: "12px", color: "var(--text-3)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        {teams.map(t => (
+                          <span key={t.team} style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <Flag country={t.team} size={14} /> {t.team}
+                          </span>
+                        ))}
+                      </span>
                     </div>
                     <div style={{ display: "grid", gap: "5px" }}>
                       {matches.map((m) => {
                         const res = localState.results.group[m.id];
                         return (
                           <div key={m.id} className="card" style={{ padding: "8px 14px", display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ flex: 1, textAlign: "right", fontSize: "12px", fontWeight: 500 }}>{m.home.flag} {m.home.team}</span>
+                            <span style={{ flex: 1, textAlign: "right", fontSize: "12px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px" }}><Flag country={m.home.team} size={16} /> {m.home.team}</span>
                             <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res?.home ?? ""} onChange={(e) => updateGroupResult(m.id, "home", e.target.value)} style={{ fontSize: "14px" }} />
                             <span style={{ color: "var(--text-3)", fontSize: "12px" }}>–</span>
                             <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res?.away ?? ""} onChange={(e) => updateGroupResult(m.id, "away", e.target.value)} style={{ fontSize: "14px" }} />
-                            <span style={{ flex: 1, fontSize: "12px", fontWeight: 500 }}>{m.away.flag} {m.away.team}</span>
+                            <span style={{ flex: 1, fontSize: "12px", fontWeight: 500, display: "flex", alignItems: "center", gap: "5px" }}><Flag country={m.away.team} size={16} /> {m.away.team}</span>
                           </div>
                         );
                       })}
