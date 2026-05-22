@@ -32,8 +32,7 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
 
   return (
     <div>
-      {/* Progress bar */}
-      <div className="card" style={{ padding: "16px 20px", marginBottom: "20px" }}>
+      <div className="card" style={{ padding: "14px 18px", marginBottom: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <span style={{ fontSize: "13px", fontWeight: 600 }}>Predictions filled</span>
           <span style={{ fontSize: "13px", color: "var(--text-2)" }}>{countFilled} / {totalMatches}</span>
@@ -48,29 +47,31 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
         const groupFilled = matches.filter(m => player.groupPredictions[m.id]?.home !== "" && player.groupPredictions[m.id]?.away !== "").length;
         return (
           <div key={group} style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <div style={{ width: "28px", height: "28px", background: "var(--green)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <div style={{ width: "26px", height: "26px", background: "var(--green)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "12px", fontWeight: 700, flexShrink: 0 }}>
                 {group}
               </div>
               <span style={{ fontWeight: 700, fontSize: "14px" }}>Group {group}</span>
-              <span style={{ fontSize: "12px", color: "var(--text-3)", marginLeft: "auto" }}>
-                {teams.map(t => `${t.flag} ${t.team}`).join(" · ")}
-              </span>
-              <span className="badge" style={{ background: groupFilled === matches.length ? "var(--green-light)" : "var(--bg)", color: groupFilled === matches.length ? "var(--green)" : "var(--text-3)", border: "1px solid var(--border)", marginLeft: "8px" }}>
+              <div style={{ display: "flex", gap: "6px", marginLeft: "4px", flexWrap: "wrap" }}>
+                {teams.map(t => (
+                  <span key={t.team} style={{ fontSize: "12px", color: "var(--text-3)" }}>{t.flag} {t.team}</span>
+                ))}
+              </div>
+              <span className="badge" style={{ background: groupFilled === matches.length ? "#dcfce7" : "var(--bg)", color: groupFilled === matches.length ? "var(--green)" : "var(--text-3)", border: "1px solid var(--border)", marginLeft: "auto" }}>
                 {groupFilled}/{matches.length}
               </span>
             </div>
 
-            <div style={{ display: "grid", gap: "6px" }}>
+            <div style={{ display: "grid", gap: "5px" }}>
               {matches.map((match) => {
                 const pred = player.groupPredictions[match.id];
                 const filled = pred?.home !== "" && pred?.away !== "" && pred?.home !== undefined;
                 return (
-                  <div key={match.id} className="card" style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px", borderColor: filled ? "var(--green-light)" : undefined }}>
+                  <div key={match.id} className="card" style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: "8px", borderColor: filled ? "#bbf7d0" : undefined }}>
                     <span style={{ flex: 1, textAlign: "right", fontSize: "13px", fontWeight: 500 }}>{match.home.flag} {match.home.team}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
                       <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={(e) => updateScore(match.id, "home", e.target.value)} disabled={readonly} />
-                      <span style={{ color: "var(--text-3)", fontSize: "12px", fontWeight: 600 }}>—</span>
+                      <span style={{ color: "var(--text-3)", fontSize: "11px", fontWeight: 600 }}>—</span>
                       <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={(e) => updateScore(match.id, "away", e.target.value)} disabled={readonly} />
                     </div>
                     <span style={{ flex: 1, fontSize: "13px", fontWeight: 500 }}>{match.away.flag} {match.away.team}</span>

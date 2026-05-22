@@ -1,30 +1,33 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useCallback } from "react";
-import { Player, AdminState } from "@/app/data/types";
-import { getPlayers, getCurrentUserId, getPlayer, getAdminState, setCurrentUserId } from "@/lib/storage";
+import { Player, AdminState, FantasySquad, PlayerStat } from "@/app/data/types";
+import { getPlayers, getCurrentUserId, getPlayer, getAdminState, setCurrentUserId, getAllFantasySquads, getAllPlayerStats } from "@/lib/storage";
 import SignUp from "@/app/components/SignUp";
 import GroupPredictions from "@/app/components/GroupPredictions";
 import KnockoutPredictions from "@/app/components/KnockoutPredictions";
 import Leaderboard from "@/app/components/Leaderboard";
+import FantasySquadPicker from "@/app/components/FantasySquad";
+import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
 import AdminPanel from "@/app/components/AdminPanel";
 
-type Tab = "groups" | "knockout" | "leaderboard" | "admin" | "profile";
+type Tab = "groups" | "knockout" | "predictor-board" | "fantasy" | "fantasy-board" | "profile" | "admin";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [adminState, setAdminState] = useState<AdminState>({ isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "" });
-  const [activeTab, setActiveTab] = useState<Tab>("leaderboard");
+  const [fantasySquads, setFantasySquads] = useState<FantasySquad[]>([]);
+  const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("predictor-board");
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminClicks, setAdminClicks] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [ps, as] = await Promise.all([getPlayers(), getAdminState()]);
-    setPlayers(ps);
-    setAdminState(as);
+    const [ps, as, fs, stats] = await Promise.all([getPlayers(), getAdminState(), getAllFantasySquads(), getAllPlayerStats()]);
+    setPlayers(ps); setAdminState(as); setFantasySquads(fs); setPlayerStats(stats);
   }, []);
 
   useEffect(() => {
@@ -32,42 +35,19 @@ export default function Home() {
       const id = getCurrentUserId();
       if (id) {
         const player = await getPlayer(id);
-        if (player) { setCurrentPlayer(player); setActiveTab("groups"); }
+        if (player) { setCurrentPlayer(player); setActiveTab("predictor-board"); }
       }
       await refresh();
-      setMounted(true);
-      setLoading(false);
+      setMounted(true); setLoading(false);
     };
     init();
   }, [refresh]);
 
-  const handleSignup = async (player: Player) => {
-    setCurrentPlayer(player);
-    setActiveTab("groups");
-    await refresh();
-  };
-
-  const handlePlayerUpdate = async (updated: Player) => {
-    setCurrentPlayer(updated);
-    await refresh();
-  };
-
-  const handleAdminUpdate = async (state: AdminState) => {
-    setAdminState(state);
-    await refresh();
-  };
-
-  const handleLogout = () => {
-    setCurrentUserId(null);
-    setCurrentPlayer(null);
-    setActiveTab("leaderboard");
-  };
-
-  const handleTitleClick = () => {
-    const next = adminClicks + 1;
-    setAdminClicks(next);
-    if (next >= 5) { setShowAdmin(true); setAdminClicks(0); }
-  };
+  const handleSignup = async (player: Player) => { setCurrentPlayer(player); setActiveTab("groups"); await refresh(); };
+  const handlePlayerUpdate = async (updated: Player) => { setCurrentPlayer(updated); await refresh(); };
+  const handleAdminUpdate = async (state: AdminState) => { setAdminState(state); await refresh(); };
+  const handleLogout = () => { setCurrentUserId(null); setCurrentPlayer(null); setActiveTab("predictor-board"); };
+  const handleTitleClick = () => { const n = adminClicks + 1; setAdminClicks(n); if (n >= 5) { setShowAdmin(true); setAdminClicks(0); } };
 
   if (!mounted || loading) {
     return (
@@ -82,12 +62,14 @@ export default function Home() {
 
   if (!currentPlayer) return <SignUp onComplete={handleSignup} />;
 
-  const tabs: { id: Tab; label: string; emoji: string }[] = [
-    { id: "groups", label: "Groups", emoji: "🏟️" },
-    { id: "knockout", label: "Knockouts", emoji: "⚔️" },
-    { id: "leaderboard", label: "Leaderboard", emoji: "🏆" },
-    { id: "profile", label: "Profile", emoji: "👤" },
-    ...(showAdmin ? [{ id: "admin" as Tab, label: "Admin", emoji: "⚙️" }] : []),
+  const tabs: { id: Tab; label: string; emoji: string; group?: string }[] = [
+    { id: "groups", label: "Groups", emoji: "🏟️", group: "predict" },
+    { id: "knockout", label: "Knockouts", emoji: "⚔️", group: "predict" },
+    { id: "predictor-board", label: "Predictor Board", emoji: "🏆", group: "predict" },
+    { id: "fantasy", label: "My Squad", emoji: "👕", group: "fantasy" },
+    { id: "fantasy-board", label: "Fantasy Board", emoji: "⭐", group: "fantasy" },
+    { id: "profile", label: "Profile", emoji: "👤", group: "other" },
+    ...(showAdmin ? [{ id: "admin" as Tab, label: "Admin", emoji: "⚙️", group: "other" }] : []),
   ];
 
   return (
@@ -97,25 +79,37 @@ export default function Home() {
         <div onClick={handleTitleClick} style={{ cursor: "default", display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ width: "36px", height: "36px", background: "var(--green)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>⚽</div>
           <div>
-            <h1 style={{ fontSize: "17px", fontWeight: 800, color: "var(--text)" }}>World Cup 2026 Predictor</h1>
+            <h1 style={{ fontSize: "17px", fontWeight: 800 }}>World Cup 2026</h1>
             <p style={{ fontSize: "11px", color: "var(--text-3)" }}>{currentPlayer.teamName} · {currentPlayer.name}</p>
           </div>
         </div>
         <button className="btn-ghost" onClick={handleLogout} style={{ fontSize: "12px" }}>Switch user</button>
       </div>
 
-      {/* Tabs */}
+      {/* Tab groups */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "20px", overflowX: "auto" }}>
-        {tabs.map((t) => (
-          <button key={t.id} className={`tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
-            {t.emoji} {t.label}
-          </button>
-        ))}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.06em", padding: "0 10px", whiteSpace: "nowrap" }}>Predictor</span>
+          {tabs.filter(t => t.group === "predict").map(t => (
+            <button key={t.id} className={`tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>{t.emoji} {t.label}</button>
+          ))}
+          <div style={{ width: "1px", height: "20px", background: "var(--border)", margin: "0 4px" }} />
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.06em", padding: "0 10px", whiteSpace: "nowrap" }}>Fantasy</span>
+          {tabs.filter(t => t.group === "fantasy").map(t => (
+            <button key={t.id} className={`tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>{t.emoji} {t.label}</button>
+          ))}
+          <div style={{ width: "1px", height: "20px", background: "var(--border)", margin: "0 4px" }} />
+          {tabs.filter(t => t.group === "other").map(t => (
+            <button key={t.id} className={`tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>{t.emoji} {t.label}</button>
+          ))}
+        </div>
       </div>
 
       {activeTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={handlePlayerUpdate} />}
       {activeTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={handlePlayerUpdate} />}
-      {activeTab === "leaderboard" && <Leaderboard players={players} adminState={adminState} currentPlayerId={currentPlayer.id} />}
+      {activeTab === "predictor-board" && <Leaderboard players={players} adminState={adminState} currentPlayerId={currentPlayer.id} />}
+      {activeTab === "fantasy" && <FantasySquadPicker player={currentPlayer} />}
+      {activeTab === "fantasy-board" && <FantasyLeaderboard players={players} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}
       {activeTab === "profile" && (
         <div>
           <h2 style={{ fontSize: "17px", fontWeight: 700, marginBottom: "16px" }}>Update Profile</h2>
@@ -123,7 +117,7 @@ export default function Home() {
         </div>
       )}
       {activeTab === "admin" && (
-        <AdminPanel adminState={adminState} onUpdate={handleAdminUpdate} onClose={() => { setActiveTab("leaderboard"); setShowAdmin(false); }} />
+        <AdminPanel adminState={adminState} onUpdate={handleAdminUpdate} onClose={() => { setActiveTab("predictor-board"); setShowAdmin(false); }} />
       )}
     </div>
   );
