@@ -15,137 +15,203 @@ interface Props {
   onUpdate: (url: string) => void;
 }
 
-// ── Crop Tool ─────────────────────────────────────────────
-function CropTool({ imageSrc, onCrop, onCancel }: { imageSrc: string; onCrop: (blob: Blob) => void; onCancel: () => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [dragging, setDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
-  const imgRef = useRef<HTMLImageElement>(null);
-  const CROP_SIZE = 260;
+const CROP_SIZE = 260; // px — the circular viewport shown to the user
+const OUTPUT_SIZE = 300; // px — final exported image
 
+// ── Crop Tool ─────────────────────────────────────────────
+function CropTool({ imageSrc, onCrop, onCancel }: {
+  imageSrc: string;
+  onCrop: (blob: Blob) => void;
+  onCancel: () => void;
+}) {
+  // imgPos is the top-left of the image relative to the crop container
+  const [imgPos, setImgPos] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragOrigin = useRef({ mx: 0, my: 0, ix: 0, iy: 0 });
+
+  // Load image, set initial zoom so it fills the circle
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      setImgSize({ w: img.naturalWidth, h: img.naturalHeight });
-      // Start centred
-      const scale = CROP_SIZE / Math.min(img.naturalWidth, img.naturalHeight);
-      setZoom(scale);
-      setOffset({ x: 0, y: 0 });
+      const { naturalWidth: w, naturalHeight: h } = img;
+      setNaturalSize({ w, h });
+      const initialZoom = CROP_SIZE / Math.min(w, h);
+      setZoom(initialZoom);
+      // Centre the image in the crop window
+      const displayW = w * initialZoom;
+      const displayH = h * initialZoom;
+      setImgPos({ x: (CROP_SIZE - displayW) / 2, y: (CROP_SIZE - displayH) / 2 });
     };
     img.src = imageSrc;
   }, [imageSrc]);
 
+  // Displayed image size at current zoom
+  const displayW = naturalSize.w * zoom;
+  const displayH = naturalSize.h * zoom;
+
+  // Clamp so image always covers the crop circle
+  const clamp = useCallback((pos: { x: number; y: number }) => ({
+    x: Math.min(0, Math.max(CROP_SIZE - displayW, pos.x)),
+    y: Math.min(0, Math.max(CROP_SIZE - displayH, pos.y)),
+  }), [displayW, displayH]);
+
+  // When zoom changes, re-centre while keeping the crop covered
+  const handleZoom = (newZoom: number) => {
+    const newW = naturalSize.w * newZoom;
+    const newH = naturalSize.h * newZoom;
+    // Keep the centre of the visible area stable
+    const cx = CROP_SIZE / 2;
+    const cy = CROP_SIZE / 2;
+    const ratioX = (cx - imgPos.x) / displayW;
+    const ratioY = (cy - imgPos.y) / displayH;
+    const newX = cx - ratioX * newW;
+    const newY = cy - ratioY * newH;
+    setZoom(newZoom);
+    setImgPos({
+      x: Math.min(0, Math.max(CROP_SIZE - newW, newX)),
+      y: Math.min(0, Math.max(CROP_SIZE - newH, newY)),
+    });
+  };
+
+  // Mouse drag
   const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
     setDragging(true);
-    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+    dragOrigin.current = { mx: e.clientX, my: e.clientY, ix: imgPos.x, iy: imgPos.y };
   };
   const onMouseMove = useCallback((e: MouseEvent) => {
     if (!dragging) return;
-    setOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  }, [dragging, dragStart]);
+    const dx = e.clientX - dragOrigin.current.mx;
+    const dy = e.clientY - dragOrigin.current.my;
+    setImgPos(clamp({ x: dragOrigin.current.ix + dx, y: dragOrigin.current.iy + dy }));
+  }, [dragging, clamp]);
   const onMouseUp = useCallback(() => setDragging(false), []);
-
   useEffect(() => {
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
   }, [onMouseMove, onMouseUp]);
 
-  // Touch support
+  // Touch drag
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     setDragging(true);
-    setDragStart({ x: t.clientX - offset.x, y: t.clientY - offset.y });
+    dragOrigin.current = { mx: t.clientX, my: t.clientY, ix: imgPos.x, iy: imgPos.y };
   };
   const onTouchMove = (e: React.TouchEvent) => {
     if (!dragging) return;
     const t = e.touches[0];
-    setOffset({ x: t.clientX - dragStart.x, y: t.clientY - dragStart.y });
+    const dx = t.clientX - dragOrigin.current.mx;
+    const dy = t.clientY - dragOrigin.current.my;
+    setImgPos(clamp({ x: dragOrigin.current.ix + dx, y: dragOrigin.current.iy + dy }));
   };
 
+  // Export: draw the visible crop region onto a canvas
   const handleCrop = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = 300;
-    canvas.height = 300;
+    canvas.width = OUTPUT_SIZE;
+    canvas.height = OUTPUT_SIZE;
     const ctx = canvas.getContext("2d")!;
+
+    // Circular clip
     ctx.beginPath();
-    ctx.arc(150, 150, 150, 0, Math.PI * 2);
+    ctx.arc(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, 0, Math.PI * 2);
     ctx.clip();
 
     const img = new Image();
     img.onload = () => {
-      const displayedW = imgSize.w * zoom;
-      const displayedH = imgSize.h * zoom;
-      // Centre of crop window in display coords
-      const cropCX = CROP_SIZE / 2;
-      const cropCY = CROP_SIZE / 2;
-      // Top-left of image in display coords
-      const imgLeft = offset.x + CROP_SIZE / 2 - displayedW / 2;
-      const imgTop = offset.y + CROP_SIZE / 2 - displayedH / 2;
-      // Crop region in image natural coords
-      const srcX = (cropCX - imgLeft) / zoom - 150 / zoom;
-      const srcY = (cropCY - imgTop) / zoom - 150 / zoom;
-      const srcSize = 300 / zoom;
-      ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, 300, 300);
-      canvas.toBlob((blob) => { if (blob) onCrop(blob); }, "image/jpeg", 0.92);
+      // imgPos.x/y is where the top-left of the displayed image sits in the crop container.
+      // The crop window's top-left is at (0,0) in container coords.
+      // Source region in natural image pixels:
+      const srcX = (0 - imgPos.x) / zoom;
+      const srcY = (0 - imgPos.y) / zoom;
+      const srcW = CROP_SIZE / zoom;
+      const srcH = CROP_SIZE / zoom;
+
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+      canvas.toBlob((blob) => { if (blob) onCrop(blob); }, "image/jpeg", 0.93);
     };
     img.src = imageSrc;
   };
 
-  const displayedW = imgSize.w * zoom;
-  const displayedH = imgSize.h * zoom;
-  const imgLeft = offset.x + CROP_SIZE / 2 - displayedW / 2;
-  const imgTop = offset.y + CROP_SIZE / 2 - displayedH / 2;
+  const minZoom = naturalSize.w ? CROP_SIZE / Math.min(naturalSize.w, naturalSize.h) : 0.5;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      <p style={{ fontSize: "13px", fontWeight: 600 }}>Position your photo</p>
-      <p style={{ fontSize: "12px", color: "var(--text-2)" }}>Drag to reposition · Use the slider to zoom</p>
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div>
+        <p style={{ fontSize: "13px", fontWeight: 600, marginBottom: "2px" }}>Position your photo</p>
+        <p style={{ fontSize: "12px", color: "var(--text-2)" }}>Drag inside the circle to reposition · use the slider to zoom</p>
+      </div>
 
       {/* Crop window */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div
-          ref={containerRef}
-          style={{ position: "relative", width: CROP_SIZE, height: CROP_SIZE, borderRadius: "50%", overflow: "hidden", cursor: dragging ? "grabbing" : "grab", border: "3px solid var(--green)", userSelect: "none", boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", flexShrink: 0 }}
-          onMouseDown={onMouseDown}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={() => setDragging(false)}
-        >
-          {imageSrc && (
-            <img
-              ref={imgRef}
-              src={imageSrc}
-              alt="crop"
-              draggable={false}
-              style={{ position: "absolute", width: displayedW, height: displayedH, left: imgLeft, top: imgTop, pointerEvents: "none" }}
-            />
-          )}
+        <div style={{ position: "relative", width: CROP_SIZE, height: CROP_SIZE, flexShrink: 0 }}>
+          {/* Dark overlay with circular hole */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
+            background: `radial-gradient(circle ${CROP_SIZE / 2}px at center, transparent ${CROP_SIZE / 2}px, rgba(0,0,0,0.55) ${CROP_SIZE / 2}px)`,
+          }} />
+          {/* Circle border */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+            borderRadius: "50%", border: "2.5px solid var(--green)",
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+          }} />
+          {/* Draggable image layer */}
+          <div
+            style={{ position: "absolute", inset: 0, overflow: "hidden", cursor: dragging ? "grabbing" : "grab", borderRadius: "4px" }}
+            onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={() => setDragging(false)}
+          >
+            {imageSrc && naturalSize.w > 0 && (
+              <img
+                src={imageSrc}
+                alt="crop preview"
+                draggable={false}
+                style={{
+                  position: "absolute",
+                  left: imgPos.x,
+                  top: imgPos.y,
+                  width: displayW,
+                  height: displayH,
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              />
+            )}
+          </div>
         </div>
       </div>
 
       {/* Zoom slider */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <span style={{ fontSize: "12px", color: "var(--text-3)" }}>🔍−</span>
+        <span style={{ fontSize: "18px", lineHeight: 1 }}>🔍</span>
         <input
           type="range"
-          min={imgSize.w ? CROP_SIZE / Math.max(imgSize.w, imgSize.h) : 0.5}
-          max={4}
-          step={0.01}
+          min={minZoom}
+          max={minZoom * 4}
+          step={0.001}
           value={zoom}
-          onChange={e => setZoom(parseFloat(e.target.value))}
+          onChange={e => handleZoom(parseFloat(e.target.value))}
           style={{ flex: 1, accentColor: "var(--green)" }}
         />
-        <span style={{ fontSize: "12px", color: "var(--text-3)" }}>+</span>
+        <span style={{ fontSize: "12px", color: "var(--text-3)", fontWeight: 600, minWidth: "40px" }}>
+          {Math.round((zoom / minZoom) * 100)}%
+        </span>
       </div>
 
       {/* Actions */}
       <div style={{ display: "flex", gap: "8px" }}>
-        <button className="btn-primary" type="button" onClick={handleCrop} style={{ flex: 1, justifyContent: "center" }}>✓ Use This</button>
-        <button className="btn-secondary" type="button" onClick={onCancel}>Cancel</button>
+        <button className="btn-primary" type="button" onClick={handleCrop} style={{ flex: 1, justifyContent: "center" }}>
+          ✓ Use This Photo
+        </button>
+        <button className="btn-secondary" type="button" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </div>
   );
@@ -159,7 +225,7 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isEmoji = currentUrl.startsWith("emoji:");
+  const isEmoji = currentUrl?.startsWith("emoji:");
   const emojiChar = isEmoji ? currentUrl.replace("emoji:", "") : "";
 
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,7 +236,6 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
     const reader = new FileReader();
     reader.onload = (ev) => setCropSrc(ev.target?.result as string);
     reader.readAsDataURL(file);
-    // Reset input so same file can be re-selected
     e.target.value = "";
   };
 
@@ -214,7 +279,9 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
               <button className="btn-secondary" type="button" onClick={() => fileRef.current?.click()} disabled={uploading} style={{ width: "100%" }}>
                 {uploading ? "Uploading..." : currentUrl && !isEmoji ? "Change Photo" : "Choose Photo"}
               </button>
-              <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "6px" }}>JPG, PNG or GIF · max 10MB · you'll be able to crop after choosing</p>
+              <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "6px" }}>
+                JPG, PNG or GIF · max 10MB · crop and position after selecting
+              </p>
               {error && <p style={{ fontSize: "12px", color: "var(--red)", marginTop: "6px" }}>{error}</p>}
             </div>
           )}
@@ -246,7 +313,7 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
   );
 }
 
-// ── Reusable display ──────────────────────────────────────
+// ── Reusable AvatarDisplay ────────────────────────────────
 export function AvatarDisplay({ url, name, size = 36 }: { url: string; name: string; size?: number }) {
   const isEmoji = url?.startsWith("emoji:");
   const emojiChar = isEmoji ? url.replace("emoji:", "") : "";
