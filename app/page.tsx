@@ -139,7 +139,17 @@ export default function Home() {
               </div>
             </div>
           )}
-          <KnockoutPredictions player={currentPlayer} onUpdate={handlePlayerUpdate} readonly={isPredictionLocked(adminState)} />
+          <KnockoutPredictions
+            player={currentPlayer}
+            onUpdate={handlePlayerUpdate}
+            readonly={isPredictionLocked(adminState)}
+            confirmedTeams={Object.fromEntries(
+              Object.entries(adminState.results.knockout).map(([matchId, r]) => [
+                matchId,
+                { home: r.homeTeam || "", away: r.awayTeam || "" }
+              ])
+            )}
+          />
         </div>
       )}
       {activeTab === "predictor-board" && <Leaderboard players={players} adminState={adminState} currentPlayerId={currentPlayer.id} />}
