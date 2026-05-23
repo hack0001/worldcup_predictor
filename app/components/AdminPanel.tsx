@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import { AdminState, PlayerStat } from "@/app/data/types";
-import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION } from "@/app/data/worldcup";
+import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
 import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat } from "@/lib/storage";
 import Flag from "./Flag";
+import FlagSelect from "./FlagSelect";
 
 interface Props {
   adminState: AdminState;
@@ -13,26 +14,6 @@ interface Props {
 
 const ADMIN_PASSWORD = "worldcup2026";
 
-function PlayerPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [selectedCountry, setSelectedCountry] = useState<string>(() => Object.entries(SQUADS).find(([, s]) => s.players.includes(value))?.[0] || "");
-  const countries = Object.keys(SQUADS).sort();
-  const players = selectedCountry ? SQUADS[selectedCountry].players.sort() : [];
-  return (
-    <div>
-      <label className="label">{label}</label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-        <select value={selectedCountry} onChange={(e) => { setSelectedCountry(e.target.value); onChange(""); }}>
-          <option value="">Country...</option>
-          {countries.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={value} onChange={(e) => onChange(e.target.value)} disabled={!selectedCountry}>
-          <option value="">Player...</option>
-          {players.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-    </div>
-  );
-}
 
 const ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter Finals", "Semi Finals", "Final"];
 
@@ -62,19 +43,63 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
 
   const updateGroupResult = (matchId: string, side: "home" | "away", value: string) => {
     const v = value.replace(/\D/g, "").slice(0, 2);
-    setLocalState((s) => ({
-      ...s,
-      results: {
-        ...s.results,
-        group: {
-          ...s.results.group,
-          [matchId]: {
-            home: side === "home" ? v : (s.results.group[matchId]?.home ?? ""),
-            away: side === "away" ? v : (s.results.group[matchId]?.away ?? ""),
-          },
+    setLocalState((s) => {
+      const newGroup = {
+        ...s.results.group,
+        [matchId]: {
+          home: side === "home" ? v : (s.results.group[matchId]?.home ?? ""),
+          away: side === "away" ? v : (s.results.group[matchId]?.away ?? ""),
         },
-      },
-    }));
+      };
+
+      // Recalculate group standings and auto-populate R32 slots
+      const newKnockout = { ...s.results.knockout };
+
+      for (const [group, teams] of Object.entries(GROUPS)) {
+        const groupMatches = GROUP_MATCHES.filter(m => m.group === group);
+
+        // Calculate points/GD for each team
+        const standings: Record<string, { pts: number; gd: number; gf: number }> = {};
+        teams.forEach(t => { standings[t.team] = { pts: 0, gd: 0, gf: 0 }; });
+
+        for (const m of groupMatches) {
+          const res = newGroup[m.id];
+          if (!res || res.home === "" || res.away === "") continue;
+          const h = parseInt(res.home), a = parseInt(res.away);
+          if (isNaN(h) || isNaN(a)) continue;
+          standings[m.home.team].gf += h;
+          standings[m.away.team].gf += a;
+          standings[m.home.team].gd += h - a;
+          standings[m.away.team].gd += a - h;
+          if (h > a) { standings[m.home.team].pts += 3; }
+          else if (a > h) { standings[m.away.team].pts += 3; }
+          else { standings[m.home.team].pts += 1; standings[m.away.team].pts += 1; }
+        }
+
+        const sorted = Object.entries(standings)
+          .sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+        const allPlayed = groupMatches.every(m => {
+          const res = newGroup[m.id];
+          return res && res.home !== "" && res.away !== "";
+        });
+
+        // Only populate R32 when all group games have scores
+        if (allPlayed && GROUP_TO_R32[group]) {
+          const first = sorted[0][0];
+          const second = sorted[1][0];
+          const { first: firstSlot, second: secondSlot } = GROUP_TO_R32[group];
+
+          const firstMatch = newKnockout[firstSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+          newKnockout[firstSlot.matchId] = { ...firstMatch, [firstSlot.role === "home" ? "homeTeam" : "awayTeam"]: first };
+
+          const secondMatch = newKnockout[secondSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+          newKnockout[secondSlot.matchId] = { ...secondMatch, [secondSlot.role === "home" ? "homeTeam" : "awayTeam"]: second };
+        }
+      }
+
+      return { ...s, results: { ...s.results, group: newGroup, knockout: newKnockout } };
+    });
   };
 
   const updateKnockoutResult = (matchId: string, field: string, value: string) => {
@@ -187,8 +212,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           <div className="card" style={{ padding: "18px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "14px" }}>Tournament Awards</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <PlayerPicker label="⚽ Golden Boot Winner" value={localState.topScorer} onChange={(v) => setLocalState({ ...localState, topScorer: v })} />
-              <PlayerPicker label="🎯 Top Assist Winner" value={localState.topAssist} onChange={(v) => setLocalState({ ...localState, topAssist: v })} />
+              <FlagSelect label="⚽ Golden Boot Winner" value={localState.topScorer} onChange={(v) => setLocalState({ ...localState, topScorer: v })} />
+              <FlagSelect label="🎯 Top Assist Winner" value={localState.topAssist} onChange={(v) => setLocalState({ ...localState, topAssist: v })} />
             </div>
           </div>
 

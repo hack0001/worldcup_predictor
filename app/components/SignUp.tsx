@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Player } from "@/app/data/types";
 import { getPlayerByEmail, savePlayer, setCurrentUserId } from "@/lib/storage";
-import { SQUADS } from "@/app/data/worldcup";
+import FlagSelect from "./FlagSelect";
 
 interface Props {
   onComplete: (player: Player) => void;
@@ -10,36 +10,6 @@ interface Props {
 }
 
 type Mode = "signup" | "login";
-
-function PlayerPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [selectedCountry, setSelectedCountry] = useState<string>(() => {
-    if (!value) return "";
-    return Object.entries(SQUADS).find(([, s]) => s.players.includes(value))?.[0] || "";
-  });
-  const countries = Object.keys(SQUADS).sort();
-  const players = selectedCountry ? SQUADS[selectedCountry].players.sort() : [];
-
-  return (
-    <div>
-      <label className="label">{label}</label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-        <select value={selectedCountry} onChange={(e) => { setSelectedCountry(e.target.value); onChange(""); }}>
-          <option value="">Select country...</option>
-          {countries.map((c) => <option key={c} value={c}>{SQUADS[c].flag} {c}</option>)}
-        </select>
-        <select value={value} onChange={(e) => onChange(e.target.value)} disabled={!selectedCountry}>
-          <option value="">Select player...</option>
-          {players.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-      {value && (
-        <p style={{ marginTop: "6px", fontSize: "12px", color: "var(--green)", fontWeight: 500 }}>
-          ✓ {value} {selectedCountry && `(${SQUADS[selectedCountry].flag} ${selectedCountry})`}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function SignUp({ onComplete, existingPlayer }: Props) {
   const [mode, setMode] = useState<Mode>("signup");
@@ -104,8 +74,8 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
               <p className="section-title" style={{ marginBottom: "4px" }}>Bonus Predictions</p>
               <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot = +15pts · Top Assist = +10pts</p>
               <div style={{ display: "grid", gap: "16px" }}>
-                <PlayerPicker label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
-                <PlayerPicker label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
+                <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
+                <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
               </div>
             </div>
             {error && <p style={{ color: "var(--red)", fontSize: "13px" }}>{error}</p>}
@@ -166,8 +136,8 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
                     <p style={{ fontWeight: 700, marginBottom: "4px" }}>Bonus Predictions</p>
                     <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot = +15pts · Top Assist = +10pts</p>
                     <div style={{ display: "grid", gap: "16px" }}>
-                      <PlayerPicker label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
-                      <PlayerPicker label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
+                      <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
+                      <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
                     </div>
                   </div>
                   {error && <p style={{ color: "var(--red)", fontSize: "13px" }}>{error}</p>}

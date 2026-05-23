@@ -237,10 +237,8 @@ export const KNOCKOUT_MATCHES: Record<string, { id: string; label: string; place
   ],
 };
 
-// The official FIFA knockout bracket progression
-// Maps who feeds into each R32 match, used for auto-populating teams
+// The official FIFA knockout bracket progression (R32 → R16 → QF → SF → Final)
 export const BRACKET_PROGRESSION: Record<string, string> = {
-  // R32 feeds into R16
   "r16-90": "r32-73,r32-75",
   "r16-89": "r32-74,r32-77",
   "r16-91": "r32-76,r32-78",
@@ -249,17 +247,34 @@ export const BRACKET_PROGRESSION: Record<string, string> = {
   "r16-94": "r32-81,r32-82",
   "r16-95": "r32-86,r32-88",
   "r16-96": "r32-85,r32-87",
-  // R16 feeds into QF
   "qf-97": "r16-89,r16-90",
   "qf-98": "r16-93,r16-94",
   "qf-99": "r16-91,r16-92",
   "qf-100": "r16-95,r16-96",
-  // QF feeds into SF
   "sf-101": "qf-97,qf-98",
   "sf-102": "qf-99,qf-100",
-  // SF feeds into Final
   "final-104": "sf-101,sf-102",
   "3rd-103": "sf-101,sf-102",
+};
+
+// Group standings → R32 slot mapping
+// Each entry: which R32 match does the group 1st/2nd feed into, and as home or away
+export type SlotRole = "home" | "away";
+export interface GroupSlot { matchId: string; role: SlotRole }
+
+export const GROUP_TO_R32: Record<string, { first: GroupSlot; second: GroupSlot }> = {
+  A: { first:  { matchId: "r32-79", role: "home" }, second: { matchId: "r32-73", role: "home" } },
+  B: { first:  { matchId: "r32-85", role: "home" }, second: { matchId: "r32-73", role: "away" } },
+  C: { first:  { matchId: "r32-76", role: "home" }, second: { matchId: "r32-75", role: "away" } },
+  D: { first:  { matchId: "r32-81", role: "home" }, second: { matchId: "r32-88", role: "home" } },
+  E: { first:  { matchId: "r32-74", role: "home" }, second: { matchId: "r32-78", role: "home" } },
+  F: { first:  { matchId: "r32-75", role: "home" }, second: { matchId: "r32-76", role: "away" } },
+  G: { first:  { matchId: "r32-82", role: "home" }, second: { matchId: "r32-88", role: "away" } },
+  H: { first:  { matchId: "r32-84", role: "home" }, second: { matchId: "r32-86", role: "away" } },
+  I: { first:  { matchId: "r32-77", role: "home" }, second: { matchId: "r32-78", role: "away" } },
+  J: { first:  { matchId: "r32-86", role: "home" }, second: { matchId: "r32-84", role: "away" } },
+  K: { first:  { matchId: "r32-87", role: "home" }, second: { matchId: "r32-83", role: "home" } },
+  L: { first:  { matchId: "r32-80", role: "home" }, second: { matchId: "r32-83", role: "away" } },
 };
 
 export const SQUADS: Record<string, { flag: string; players: string[] }> = {
