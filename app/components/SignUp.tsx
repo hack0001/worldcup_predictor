@@ -4,6 +4,34 @@ import { Player } from "@/app/data/types";
 import { getPlayerByEmail, savePlayer, setCurrentUserId } from "@/lib/storage";
 import FlagSelect from "./FlagSelect";
 import AvatarPicker from "./AvatarPicker";
+import Flag from "./Flag";
+import { GROUPS } from "@/app/data/worldcup";
+
+// All qualified teams flat list
+const ALL_TEAMS = Object.values(GROUPS).flat().map(t => t.team).sort();
+
+function TeamPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div style={{ position: "relative" }}>
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ paddingLeft: value ? "36px" : "12px" }}
+        >
+          <option value="">-- Pick a team --</option>
+          {ALL_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {value && (
+          <div style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+            <Flag country={value} size={18} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   onComplete: (player: Player) => void;
@@ -21,6 +49,8 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
     topScorer: existingPlayer?.topScorer || "",
     topAssist: existingPlayer?.topAssist || "",
     avatarUrl: existingPlayer?.avatarUrl || "",
+    tournamentWinner: existingPlayer?.tournamentWinner || "",
+    playerOfTournament: existingPlayer?.playerOfTournament || "",
   });
   const [loginEmail, setLoginEmail] = useState("");
   const [error, setError] = useState("");
@@ -40,6 +70,8 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
       name: form.name, email: form.email, teamName: form.teamName,
       topScorer: form.topScorer, topAssist: form.topAssist,
       avatarUrl: form.avatarUrl,
+      tournamentWinner: form.tournamentWinner,
+      playerOfTournament: form.playerOfTournament,
       groupPredictions: existingPlayer?.groupPredictions || {},
       knockoutPredictions: existingPlayer?.knockoutPredictions || {},
       createdAt: existingPlayer?.createdAt || new Date().toISOString(),
@@ -75,10 +107,12 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
             </div>
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
               <p className="section-title" style={{ marginBottom: "4px" }}>Bonus Predictions</p>
-              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot = +15pts · Top Assist = +10pts</p>
+              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot +15 · Top Assist +10 · Winner +25 · POTT +20</p>
               <div style={{ display: "grid", gap: "16px" }}>
                 <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
                 <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
+                <TeamPicker label="🏆 Tournament Winner (+25pts)" value={form.tournamentWinner} onChange={(v) => setForm({ ...form, tournamentWinner: v })} />
+                <FlagSelect label="⭐ Player of the Tournament (+20pts)" value={form.playerOfTournament} onChange={(v) => setForm({ ...form, playerOfTournament: v })} />
               </div>
             </div>
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
@@ -145,10 +179,12 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
                   </div>
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
                     <p style={{ fontWeight: 700, marginBottom: "4px" }}>Bonus Predictions</p>
-                    <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot = +15pts · Top Assist = +10pts</p>
+                    <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot +15 · Top Assist +10 · Winner +25 · POTT +20</p>
                     <div style={{ display: "grid", gap: "16px" }}>
                       <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
                       <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
+                      <TeamPicker label="🏆 Tournament Winner (+25pts)" value={form.tournamentWinner} onChange={(v) => setForm({ ...form, tournamentWinner: v })} />
+                      <FlagSelect label="⭐ Player of the Tournament (+20pts)" value={form.playerOfTournament} onChange={(v) => setForm({ ...form, playerOfTournament: v })} />
                     </div>
                   </div>
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>

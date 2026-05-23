@@ -19,7 +19,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [adminState, setAdminState] = useState<AdminState>({ isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", predictionsLocked: false, lockTime: null });
+  const [adminState, setAdminState] = useState<AdminState>({ isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "", predictionsLocked: false, lockTime: null });
   const [fantasySquads, setFantasySquads] = useState<FantasySquad[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("predictor-board");

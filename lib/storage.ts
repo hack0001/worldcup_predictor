@@ -35,6 +35,8 @@ export async function savePlayer(player: Player): Promise<void> {
     id: player.id, name: player.name, email: player.email.toLowerCase(),
     team_name: player.teamName, top_scorer: player.topScorer, top_assist: player.topAssist,
     avatar_url: player.avatarUrl || "",
+    tournament_winner: player.tournamentWinner || "",
+    player_of_tournament: player.playerOfTournament || "",
     group_predictions: player.groupPredictions, knockout_predictions: player.knockoutPredictions,
     created_at: player.createdAt,
   });
@@ -46,6 +48,8 @@ function dbToPlayer(data: Record<string, unknown>): Player {
     teamName: data.team_name as string, topScorer: (data.top_scorer as string) || "",
     topAssist: (data.top_assist as string) || "",
     avatarUrl: (data.avatar_url as string) || "",
+    tournamentWinner: (data.tournament_winner as string) || "",
+    playerOfTournament: (data.player_of_tournament as string) || "",
     groupPredictions: (data.group_predictions as Player["groupPredictions"]) || {},
     knockoutPredictions: (data.knockout_predictions as Player["knockoutPredictions"]) || {},
     createdAt: data.created_at as string,
@@ -66,12 +70,14 @@ export async function uploadAvatar(playerId: string, file: File): Promise<string
 // ── Admin ─────────────────────────────────────────────────
 export async function getAdminState(): Promise<AdminState> {
   const { data } = await supabase.from("admin_state").select("*").eq("id", 1).single();
-  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", predictionsLocked: false, lockTime: null };
+  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "", predictionsLocked: false, lockTime: null };
   return {
     isAdmin: false,
     results: data.results || { group: {}, knockout: {} },
     topScorer: data.top_scorer || "",
     topAssist: data.top_assist || "",
+    tournamentWinner: data.tournament_winner || "",
+    playerOfTournament: data.player_of_tournament || "",
     predictionsLocked: data.predictions_locked || false,
     lockTime: data.lock_time || null,
   };
@@ -80,6 +86,8 @@ export async function getAdminState(): Promise<AdminState> {
 export async function saveAdminState(state: AdminState): Promise<void> {
   await supabase.from("admin_state").upsert({
     id: 1, results: state.results, top_scorer: state.topScorer, top_assist: state.topAssist,
+    tournament_winner: state.tournamentWinner || "",
+    player_of_tournament: state.playerOfTournament || "",
     predictions_locked: state.predictionsLocked,
     lock_time: state.lockTime,
   });
@@ -165,6 +173,8 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): n
   }
   if (adminState.topScorer && player.topScorer === adminState.topScorer) total += 15;
   if (adminState.topAssist && player.topAssist === adminState.topAssist) total += 10;
+  if (adminState.tournamentWinner && player.tournamentWinner === adminState.tournamentWinner) total += 25;
+  if (adminState.playerOfTournament && player.playerOfTournament === adminState.playerOfTournament) total += 20;
   return total;
 }
 

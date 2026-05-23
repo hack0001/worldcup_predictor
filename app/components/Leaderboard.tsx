@@ -28,12 +28,14 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
   return (
     <div>
       {/* Scoring info strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "20px" }}>
         {[
           { label: "Exact Score", pts: "+10", color: "var(--green)" },
           { label: "Correct Result", pts: "+6", color: "var(--blue)" },
           { label: "Golden Boot", pts: "+15", color: "var(--gold)" },
-          { label: "Top Assist", pts: "+10", color: "var(--purple)" },
+          { label: "Top Assist", pts: "+10", color: "var(--gold)" },
+          { label: "Tournament Winner", pts: "+25", color: "var(--purple)" },
+          { label: "Player of Tournament", pts: "+20", color: "var(--purple)" },
         ].map(({ label, pts, color }) => (
           <div key={label} className="card" style={{ padding: "12px", textAlign: "center" }}>
             <div style={{ fontSize: "18px", fontWeight: 800, color }}>{pts}</div>
@@ -79,6 +81,8 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
                   <div style={{ display: "flex", gap: "10px", marginTop: "4px", fontSize: "11px", color: "var(--text-3)", flexWrap: "wrap" }}>
                     {player.topScorer && <span>⚽ {scorerFlag} {player.topScorer}</span>}
                     {player.topAssist && <span>🎯 {assistFlag} {player.topAssist}</span>}
+                    {player.tournamentWinner && <span>🏆 {player.tournamentWinner}</span>}
+                    {player.playerOfTournament && <span>⭐ {player.playerOfTournament}</span>}
                   </div>
                 </div>
 
@@ -93,12 +97,14 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
         </div>
       )}
 
-      {adminState.topScorer || adminState.topAssist ? (
+      {(adminState.topScorer || adminState.topAssist || adminState.tournamentWinner || adminState.playerOfTournament) ? (
         <div className="card" style={{ padding: "16px 18px", marginTop: "20px", background: "#fffbeb", borderColor: "#fde68a" }}>
           <p style={{ fontSize: "12px", fontWeight: 700, color: "#92400e", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tournament Awards — Confirmed</p>
           <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
             {adminState.topScorer && <span style={{ fontSize: "13px" }}>⚽ Golden Boot: <strong>{adminState.topScorer}</strong></span>}
             {adminState.topAssist && <span style={{ fontSize: "13px" }}>🎯 Top Assist: <strong>{adminState.topAssist}</strong></span>}
+            {adminState.tournamentWinner && <span style={{ fontSize: "13px" }}>🏆 Winner: <strong>{adminState.tournamentWinner}</strong></span>}
+            {adminState.playerOfTournament && <span style={{ fontSize: "13px" }}>⭐ POTT: <strong>{adminState.playerOfTournament}</strong></span>}
           </div>
         </div>
       ) : null}

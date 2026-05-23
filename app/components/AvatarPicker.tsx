@@ -108,27 +108,34 @@ function CropTool({ imageSrc, onCrop, onCancel }: {
     setImgPos(clamp({ x: dragOrigin.current.ix + dx, y: dragOrigin.current.iy + dy }));
   };
 
-  // Export: draw the visible crop region onto a canvas
+  // Export — capture pos/zoom synchronously BEFORE the async img.onload
   const handleCrop = () => {
+    const capturedPos = { ...imgPos };
+    const capturedZoom = zoom;
+
     const canvas = document.createElement("canvas");
     canvas.width = OUTPUT_SIZE;
     canvas.height = OUTPUT_SIZE;
     const ctx = canvas.getContext("2d")!;
 
-    // Circular clip
+    // Circular clip for the output
     ctx.beginPath();
     ctx.arc(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, 0, Math.PI * 2);
     ctx.clip();
 
     const img = new Image();
     img.onload = () => {
-      // imgPos.x/y is where the top-left of the displayed image sits in the crop container.
-      // The crop window's top-left is at (0,0) in container coords.
-      // Source region in natural image pixels:
-      const srcX = (0 - imgPos.x) / zoom;
-      const srcY = (0 - imgPos.y) / zoom;
-      const srcW = CROP_SIZE / zoom;
-      const srcH = CROP_SIZE / zoom;
+      // capturedPos.x = left edge of displayed image in crop container pixels
+      // capturedPos.y = top edge of displayed image in crop container pixels
+      // The crop window is CROP_SIZE × CROP_SIZE.
+      // We want to draw the part of the image that's inside the crop window.
+      //
+      // In natural image coords, the top-left of the visible crop area is:
+      const srcX = -capturedPos.x / capturedZoom;
+      const srcY = -capturedPos.y / capturedZoom;
+      // ...and the visible area is CROP_SIZE px wide at the display zoom, so:
+      const srcW = CROP_SIZE / capturedZoom;
+      const srcH = CROP_SIZE / capturedZoom;
 
       ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
       canvas.toBlob((blob) => { if (blob) onCrop(blob); }, "image/jpeg", 0.93);

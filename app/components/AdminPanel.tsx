@@ -251,9 +251,32 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           {/* Awards */}
           <div className="card" style={{ padding: "18px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "14px" }}>Tournament Awards</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <FlagSelect label="⚽ Golden Boot Winner" value={localState.topScorer} onChange={(v) => setLocalState({ ...localState, topScorer: v })} />
-              <FlagSelect label="🎯 Top Assist Winner" value={localState.topAssist} onChange={(v) => setLocalState({ ...localState, topAssist: v })} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <FlagSelect label="⚽ Golden Boot Winner (+15pts)" value={localState.topScorer} onChange={(v) => setLocalState({ ...localState, topScorer: v })} />
+              <FlagSelect label="🎯 Top Assist Winner (+10pts)" value={localState.topAssist} onChange={(v) => setLocalState({ ...localState, topAssist: v })} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "14px" }}>
+              <div>
+                <label className="label">🏆 Tournament Winner (+25pts)</label>
+                <div style={{ position: "relative" }}>
+                  <select
+                    value={localState.tournamentWinner || ""}
+                    onChange={e => setLocalState({ ...localState, tournamentWinner: e.target.value })}
+                    style={{ paddingLeft: localState.tournamentWinner ? "36px" : "12px" }}
+                  >
+                    <option value="">-- Not decided yet --</option>
+                    {Object.values(GROUPS).flat().map(t => t.team).sort().map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  {localState.tournamentWinner && (
+                    <div style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                      <Flag country={localState.tournamentWinner} size={18} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <FlagSelect label="⭐ Player of Tournament (+20pts)" value={localState.playerOfTournament || ""} onChange={(v) => setLocalState({ ...localState, playerOfTournament: v })} />
             </div>
           </div>
 
