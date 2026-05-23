@@ -2,6 +2,7 @@
 import { Player, AdminState } from "@/app/data/types";
 import { calculatePlayerPoints } from "@/lib/storage";
 import { SQUADS } from "@/app/data/worldcup";
+import { AvatarDisplay } from "./AvatarPicker";
 
 interface Props {
   players: Player[];
@@ -66,9 +67,7 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
                 </div>
 
                 {/* Avatar */}
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: isTop3 ? podiumColors[idx] : "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 700, color: isTop3 ? "white" : "var(--text-2)", flexShrink: 0, border: `2px solid ${isTop3 ? podiumColors[idx] : "var(--border)"}` }}>
-                  {player.name.charAt(0).toUpperCase()}
-                </div>
+                <AvatarDisplay url={player.avatarUrl} name={player.name} size={36} />
 
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>

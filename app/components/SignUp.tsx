@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Player } from "@/app/data/types";
 import { getPlayerByEmail, savePlayer, setCurrentUserId } from "@/lib/storage";
 import FlagSelect from "./FlagSelect";
+import AvatarPicker from "./AvatarPicker";
 
 interface Props {
   onComplete: (player: Player) => void;
@@ -19,6 +20,7 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
     teamName: existingPlayer?.teamName || "",
     topScorer: existingPlayer?.topScorer || "",
     topAssist: existingPlayer?.topAssist || "",
+    avatarUrl: existingPlayer?.avatarUrl || "",
   });
   const [loginEmail, setLoginEmail] = useState("");
   const [error, setError] = useState("");
@@ -37,6 +39,7 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
       id: existingPlayer?.id || Date.now().toString(),
       name: form.name, email: form.email, teamName: form.teamName,
       topScorer: form.topScorer, topAssist: form.topAssist,
+      avatarUrl: form.avatarUrl,
       groupPredictions: existingPlayer?.groupPredictions || {},
       knockoutPredictions: existingPlayer?.knockoutPredictions || {},
       createdAt: existingPlayer?.createdAt || new Date().toISOString(),
@@ -77,6 +80,14 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
                 <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
                 <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
               </div>
+            </div>
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+              <AvatarPicker
+                playerId={existingPlayer.id}
+                currentUrl={form.avatarUrl}
+                playerName={form.name}
+                onUpdate={(url) => setForm({ ...form, avatarUrl: url })}
+              />
             </div>
             {error && <p style={{ color: "var(--red)", fontSize: "13px" }}>{error}</p>}
             <button className="btn-primary" type="submit" disabled={loading}>{loading ? "Saving..." : "Update Profile"}</button>
@@ -139,6 +150,14 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
                       <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
                       <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
                     </div>
+                  </div>
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+                    <AvatarPicker
+                      playerId={`new-${Date.now()}`}
+                      currentUrl={form.avatarUrl}
+                      playerName={form.name || "You"}
+                      onUpdate={(url) => setForm({ ...form, avatarUrl: url })}
+                    />
                   </div>
                   {error && <p style={{ color: "var(--red)", fontSize: "13px" }}>{error}</p>}
                   <button className="btn-primary" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>

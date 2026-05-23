@@ -17,6 +17,7 @@ export interface Player {
   teamName: string;
   topScorer: string;
   topAssist: string;
+  avatarUrl: string;
   groupPredictions: Record<string, ScorePrediction>;
   knockoutPredictions: Record<string, KnockoutPrediction>;
   createdAt: string;
@@ -58,6 +59,8 @@ export interface AdminState {
   };
   topScorer: string;
   topAssist: string;
+  predictionsLocked: boolean;
+  lockTime: string | null; // ISO string, null = no auto lock set
 }
 
 export const FANTASY_POINTS = {

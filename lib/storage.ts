@@ -34,6 +34,7 @@ export async function savePlayer(player: Player): Promise<void> {
   await supabase.from("players").upsert({
     id: player.id, name: player.name, email: player.email.toLowerCase(),
     team_name: player.teamName, top_scorer: player.topScorer, top_assist: player.topAssist,
+    avatar_url: player.avatarUrl || "",
     group_predictions: player.groupPredictions, knockout_predictions: player.knockoutPredictions,
     created_at: player.createdAt,
   });
@@ -44,21 +45,53 @@ function dbToPlayer(data: Record<string, unknown>): Player {
     id: data.id as string, name: data.name as string, email: data.email as string,
     teamName: data.team_name as string, topScorer: (data.top_scorer as string) || "",
     topAssist: (data.top_assist as string) || "",
+    avatarUrl: (data.avatar_url as string) || "",
     groupPredictions: (data.group_predictions as Player["groupPredictions"]) || {},
     knockoutPredictions: (data.knockout_predictions as Player["knockoutPredictions"]) || {},
     createdAt: data.created_at as string,
   };
 }
 
+// ── Avatar Upload ─────────────────────────────────────────
+export async function uploadAvatar(playerId: string, file: File): Promise<string | null> {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `${playerId}.${ext}`;
+  const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+  if (error) { console.error("Avatar upload error:", error); return null; }
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  // Add cache-bust so updated images show immediately
+  return `${data.publicUrl}?t=${Date.now()}`;
+}
+
 // ── Admin ─────────────────────────────────────────────────
 export async function getAdminState(): Promise<AdminState> {
   const { data } = await supabase.from("admin_state").select("*").eq("id", 1).single();
-  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "" };
-  return { isAdmin: false, results: data.results || { group: {}, knockout: {} }, topScorer: data.top_scorer || "", topAssist: data.top_assist || "" };
+  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", predictionsLocked: false, lockTime: null };
+  return {
+    isAdmin: false,
+    results: data.results || { group: {}, knockout: {} },
+    topScorer: data.top_scorer || "",
+    topAssist: data.top_assist || "",
+    predictionsLocked: data.predictions_locked || false,
+    lockTime: data.lock_time || null,
+  };
 }
 
 export async function saveAdminState(state: AdminState): Promise<void> {
-  await supabase.from("admin_state").upsert({ id: 1, results: state.results, top_scorer: state.topScorer, top_assist: state.topAssist });
+  await supabase.from("admin_state").upsert({
+    id: 1, results: state.results, top_scorer: state.topScorer, top_assist: state.topAssist,
+    predictions_locked: state.predictionsLocked,
+    lock_time: state.lockTime,
+  });
+}
+
+// ── Lock check ────────────────────────────────────────────
+export function isPredictionLocked(adminState: AdminState): boolean {
+  if (adminState.predictionsLocked) return true;
+  if (adminState.lockTime) {
+    return new Date() >= new Date(adminState.lockTime);
+  }
+  return false;
 }
 
 // ── Fantasy Squads ────────────────────────────────────────
@@ -140,22 +173,16 @@ export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[])
   for (const fp of squad.squad) {
     const playerStats = stats.filter((s) => s.playerName === fp.name);
     for (const s of playerStats) {
-      // Goals
       if (fp.position === "FWD") total += s.goals * FANTASY_POINTS.GOAL_FWD;
       else if (fp.position === "MID") total += s.goals * FANTASY_POINTS.GOAL_MID;
       else if (fp.position === "DEF") total += s.goals * FANTASY_POINTS.GOAL_DEF;
       else if (fp.position === "GK") total += s.goals * FANTASY_POINTS.GOAL_GK;
-      // Assists
       total += s.assists * FANTASY_POINTS.ASSIST;
-      // Clean sheets
       if (fp.position === "GK" || fp.position === "DEF") total += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF;
       else if (fp.position === "MID") total += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_MID;
-      // Cards
       total += s.yellowCards * FANTASY_POINTS.YELLOW_CARD;
       total += s.redCards * FANTASY_POINTS.RED_CARD;
-      // Saves (per 3)
       if (fp.position === "GK") total += Math.floor(s.saves / 3) * FANTASY_POINTS.SAVE_SET;
-      // Minutes
       if (s.minutesPlayed >= 60) total += FANTASY_POINTS.PLAYED_60;
       else if (s.minutesPlayed > 0) total += FANTASY_POINTS.PLAYED_SUB_60;
     }

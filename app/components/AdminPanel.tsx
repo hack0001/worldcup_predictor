@@ -208,6 +208,46 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
 
       {activeSection === "results" && (
         <div>
+          {/* Lock Controls */}
+          <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: localState.predictionsLocked ? "#fca5a5" : "#bbf7d0", background: localState.predictionsLocked ? "#fef2f2" : "#f0fdf4" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: localState.predictionsLocked ? "var(--red)" : "var(--green)" }}>
+                  {localState.predictionsLocked ? "🔒 Predictions Locked" : "🔓 Predictions Open"}
+                </p>
+                <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+                  {localState.predictionsLocked
+                    ? "Players cannot edit their predictions."
+                    : "Players can still change their predictions."}
+                </p>
+              </div>
+              <button
+                className={localState.predictionsLocked ? "btn-secondary" : "btn-primary"}
+                onClick={() => setLocalState({ ...localState, predictionsLocked: !localState.predictionsLocked })}
+                style={{ background: localState.predictionsLocked ? undefined : "var(--red)", borderColor: localState.predictionsLocked ? undefined : "var(--red)" }}
+              >
+                {localState.predictionsLocked ? "🔓 Unlock Predictions" : "🔒 Lock All Predictions Now"}
+              </button>
+            </div>
+            <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--border)" }}>
+              <label className="label">Auto-lock date & time (UK time)</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="datetime-local"
+                  value={localState.lockTime ? new Date(localState.lockTime).toISOString().slice(0, 16) : ""}
+                  onChange={(e) => setLocalState({ ...localState, lockTime: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                  style={{ flex: 1 }}
+                />
+                {localState.lockTime && (
+                  <button className="btn-ghost" onClick={() => setLocalState({ ...localState, lockTime: null })} style={{ color: "var(--red)", flexShrink: 0 }}>Clear</button>
+                )}
+              </div>
+              <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>
+                Tournament starts 11 Jun 2026 · 20:00 BST. Set this to lock automatically at kick-off.
+              </p>
+            </div>
+          </div>
+
           {/* Awards */}
           <div className="card" style={{ padding: "18px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "14px" }}>Tournament Awards</p>
