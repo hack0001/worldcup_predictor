@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { AdminState, PlayerStat } from "@/app/data/types";
+import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
-import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat } from "@/lib/storage";
+import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer } from "@/lib/storage";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
 
@@ -21,18 +21,23 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [pwError, setPwError] = useState("");
-  const [activeSection, setActiveSection] = useState<"results" | "stats">("results");
+  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users">("results");
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [stats, setStats] = useState<PlayerStat[]>([]);
+  const [users, setUsers] = useState<Player[]>([]);
+  const [editingUser, setEditingUser] = useState<Player | null>(null);
   const [newStat, setNewStat] = useState({ playerName: "", country: "", goals: "0", assists: "0", cleanSheets: "0", yellowCards: "0", redCards: "0", saves: "0", minutesPlayed: "90", round: "Group Stage" });
   const [resultsTab, setResultsTab] = useState<"groups" | "knockout">("groups");
 
   useEffect(() => {
-    if (authenticated) getAllPlayerStats().then(setStats);
+    if (authenticated) {
+      getAllPlayerStats().then(setStats);
+      getPlayers().then(setUsers);
+    }
   }, [authenticated]);
 
   const login = (e: React.FormEvent) => {
@@ -204,6 +209,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
       <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
         <button className={activeSection === "results" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("results")}>📊 Match Results</button>
         <button className={activeSection === "stats" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("stats")}>👕 Player Stats</button>
+        <button className={activeSection === "users" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("users")}>👥 Users ({users.length})</button>
       </div>
 
       {activeSection === "results" && (
@@ -444,6 +450,82 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── USERS SECTION ── */}
+      {activeSection === "users" && (
+        <div>
+          <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+            {users.length} player{users.length !== 1 ? "s" : ""} registered. You can edit their name/team or delete their account.
+          </p>
+          <div style={{ display: "grid", gap: "8px" }}>
+            {users.map(u => (
+              <div key={u.id} className="card" style={{ padding: "14px 16px" }}>
+                {editingUser?.id === u.id ? (
+                  <div style={{ display: "grid", gap: "10px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div>
+                        <label className="label">Name</label>
+                        <input value={editingUser.name} onChange={e => setEditingUser({ ...editingUser, name: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="label">Team Name</label>
+                        <input value={editingUser.teamName} onChange={e => setEditingUser({ ...editingUser, teamName: e.target.value })} />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div>
+                        <label className="label">Email</label>
+                        <input type="email" value={editingUser.email} onChange={e => setEditingUser({ ...editingUser, email: e.target.value })} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button className="btn-primary" onClick={async () => {
+                        await savePlayer(editingUser);
+                        setUsers(users.map(us => us.id === editingUser.id ? editingUser : us));
+                        setEditingUser(null);
+                      }}>Save</button>
+                      <button className="btn-secondary" onClick={() => setEditingUser(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                      {u.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: 600, fontSize: "14px" }}>{u.name}</p>
+                      <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{u.teamName}</p>
+                      <p style={{ fontSize: "11px", color: "var(--text-3)" }}>{u.email}</p>
+                      <div style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "3px", display: "flex", gap: "10px" }}>
+                        <span>⚽ {u.topScorer || "—"}</span>
+                        <span>🎯 {u.topAssist || "—"}</span>
+                        <span>🏆 {u.tournamentWinner || "—"}</span>
+                        <span>{Object.keys(u.groupPredictions).length} group preds</span>
+                        <span>{Object.keys(u.knockoutPredictions).length} KO preds</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <button className="btn-secondary" onClick={() => setEditingUser(u)} style={{ fontSize: "12px", padding: "5px 10px" }}>Edit</button>
+                      <button
+                        className="btn-ghost"
+                        style={{ color: "var(--red)", fontSize: "12px" }}
+                        onClick={async () => {
+                          if (!confirm(`Delete ${u.name}? This cannot be undone.`)) return;
+                          const { supabase } = await import("@/lib/supabase");
+                          await supabase.from("players").delete().eq("id", u.id);
+                          setUsers(users.filter(us => us.id !== u.id));
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

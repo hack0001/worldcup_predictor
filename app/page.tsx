@@ -11,8 +11,9 @@ import FantasySquadPicker from "@/app/components/FantasySquad";
 import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
 import AdminPanel from "@/app/components/AdminPanel";
 import { AvatarDisplay } from "@/app/components/AvatarPicker";
+import GroupStandings from "@/app/components/GroupStandings";
 
-type Tab = "groups" | "knockout" | "predictor-board" | "fantasy" | "fantasy-board" | "profile" | "admin";
+type Tab = "groups" | "knockout" | "predictor-board" | "standings" | "fantasy" | "fantasy-board" | "profile" | "admin";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -66,6 +67,7 @@ export default function Home() {
   const tabs: { id: Tab; label: string; emoji: string; group?: string }[] = [
     { id: "groups", label: "Groups", emoji: "🏟️", group: "predict" },
     { id: "knockout", label: "Knockouts", emoji: "⚔️", group: "predict" },
+    { id: "standings", label: "Standings", emoji: "📊", group: "predict" },
     { id: "predictor-board", label: "Predictor Board", emoji: "🏆", group: "predict" },
     { id: "fantasy", label: "My Squad", emoji: "👕", group: "fantasy" },
     { id: "fantasy-board", label: "Fantasy Board", emoji: "⭐", group: "fantasy" },
@@ -153,6 +155,7 @@ export default function Home() {
         </div>
       )}
       {activeTab === "predictor-board" && <Leaderboard players={players} adminState={adminState} currentPlayerId={currentPlayer.id} />}
+      {activeTab === "standings" && <GroupStandings adminState={adminState} />}
       {activeTab === "fantasy" && <FantasySquadPicker player={currentPlayer} />}
       {activeTab === "fantasy-board" && <FantasyLeaderboard players={players} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}
       {activeTab === "profile" && (
