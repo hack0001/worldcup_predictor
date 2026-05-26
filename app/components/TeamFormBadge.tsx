@@ -32,8 +32,6 @@ export default function TeamFormBadge({ teamName, inline = false }: Props) {
     return () => { cancelled = true; };
   }, [teamName]);
 
-  if (!process.env.NEXT_PUBLIC_FOOTBALL_API_KEY) return null;
-
   if (loading) {
     return (
       <div style={{ display: "flex", gap: "3px" }}>
@@ -139,7 +137,7 @@ export default function TeamFormBadge({ teamName, inline = false }: Props) {
             </div>
           ))}
           <div style={{ padding: "5px 10px", background: "var(--bg)", fontSize: "10px", color: "var(--text-3)", textAlign: "right" }}>
-            Last updated: {new Date(form.fetchedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · refreshes every 6h
+            Last updated: {new Date(form.updatedAt).toLocaleDateString("en-GB")}
           </div>
         </div>
       )}

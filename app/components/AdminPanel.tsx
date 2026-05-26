@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
 import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer } from "@/lib/storage";
+import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm } from "@/lib/footballApi";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
 
@@ -21,7 +22,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [pwError, setPwError] = useState("");
-  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users">("results");
+  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form">("results");
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
@@ -30,6 +31,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [stats, setStats] = useState<PlayerStat[]>([]);
   const [users, setUsers] = useState<Player[]>([]);
   const [editingUser, setEditingUser] = useState<Player | null>(null);
+  const [teamForms, setTeamForms] = useState<Record<string, TeamForm>>({});
+  const [activeFormGroup, setActiveFormGroup] = useState("A");
+  const [editingTeam, setEditingTeam] = useState<string | null>(null);
+  const [editingMatches, setEditingMatches] = useState<FormMatch[]>([]);
   const [newStat, setNewStat] = useState({ playerName: "", country: "", goals: "0", assists: "0", cleanSheets: "0", yellowCards: "0", redCards: "0", saves: "0", minutesPlayed: "90", round: "Group Stage" });
   const [resultsTab, setResultsTab] = useState<"groups" | "knockout">("groups");
 
@@ -37,6 +42,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
     if (authenticated) {
       getAllPlayerStats().then(setStats);
       getPlayers().then(setUsers);
+      getAllTeamForms().then(setTeamForms);
     }
   }, [authenticated]);
 
@@ -210,6 +216,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
       <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
         <button className={activeSection === "results" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("results")}>📊 Match Results</button>
         <button className={activeSection === "stats" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("stats")}>👕 Player Stats</button>
+        <button className={activeSection === "form" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("form")}>📋 Team Form</button>
         <button className={activeSection === "users" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("users")}>👥 Users ({users.length})</button>
       </div>
 
@@ -561,6 +568,124 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── TEAM FORM SECTION ── */}
+      {activeSection === "form" && (
+        <div>
+          <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+            Enter the last 5 matches for each team. These show as form badges on match cards and the Teams tab.
+          </p>
+
+          {/* Group selector */}
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "16px" }}>
+            {Object.keys(GROUPS).map(g => {
+              const filled = GROUPS[g].filter(t => teamForms[t.team]?.last5?.length > 0).length;
+              return (
+                <button key={g} onClick={() => setActiveFormGroup(g)} style={{ width: "40px", height: "40px", borderRadius: "8px", border: "1.5px solid", borderColor: activeFormGroup === g ? "var(--green)" : "var(--border)", background: activeFormGroup === g ? "var(--green)" : "var(--surface)", color: activeFormGroup === g ? "white" : "var(--text)", fontWeight: 700, fontSize: "14px", cursor: "pointer", position: "relative" }}>
+                  {g}
+                  {filled > 0 && activeFormGroup !== g && (
+                    <span style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "var(--green)", fontSize: 8, color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>{filled}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "grid", gap: "10px" }}>
+            {GROUPS[activeFormGroup].map(({ team }) => {
+              const existing = teamForms[team];
+              const isEditing = editingTeam === team;
+
+              const EMPTY_MATCH: FormMatch = { date: "", opponent: "", homeAway: "H", goalsFor: 0, goalsAgainst: 0, result: "W", competition: "" };
+
+              const startEditing = () => {
+                setEditingTeam(team);
+                const matches = existing?.last5?.length ? [...existing.last5] : Array(5).fill(null).map(() => ({ ...EMPTY_MATCH }));
+                // Pad to 5
+                while (matches.length < 5) matches.push({ ...EMPTY_MATCH });
+                setEditingMatches(matches.slice(0, 5));
+              };
+
+              const updateMatch = (i: number, field: keyof FormMatch, value: string | number) => {
+                const updated = [...editingMatches];
+                updated[i] = { ...updated[i], [field]: value };
+                // Auto-calc result from scores
+                if (field === "goalsFor" || field === "goalsAgainst") {
+                  const gf = field === "goalsFor" ? Number(value) : updated[i].goalsFor;
+                  const ga = field === "goalsAgainst" ? Number(value) : updated[i].goalsAgainst;
+                  updated[i].result = gf > ga ? "W" : gf < ga ? "L" : "D";
+                }
+                setEditingMatches(updated);
+              };
+
+              const saveForm = async () => {
+                const validMatches = editingMatches.filter(m => m.opponent && m.date);
+                await saveTeamForm(team, validMatches);
+                setTeamForms({ ...teamForms, [team]: { teamName: team, last5: validMatches, updatedAt: new Date().toISOString() } });
+                setEditingTeam(null);
+              };
+
+              const RESULT_COLORS: Record<string, string> = { W: "#16a34a", D: "#ca8a04", L: "#dc2626" };
+
+              return (
+                <div key={team} className="card" style={{ padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: isEditing ? "14px" : 0 }}>
+                    <Flag country={team} size={20} />
+                    <span style={{ fontWeight: 700, fontSize: "14px", flex: 1 }}>{team}</span>
+                    {/* Show existing form badges */}
+                    {!isEditing && existing?.last5?.length > 0 && (
+                      <div style={{ display: "flex", gap: "3px" }}>
+                        {existing.last5.map((m, i) => (
+                          <span key={i} style={{ width: 20, height: 20, borderRadius: "3px", background: RESULT_COLORS[m.result], color: "white", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {m.result}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {!isEditing && !existing?.last5?.length && (
+                      <span style={{ fontSize: "11px", color: "var(--text-3)" }}>No form entered</span>
+                    )}
+                    {!isEditing && (
+                      <button className="btn-secondary" onClick={startEditing} style={{ fontSize: "12px", padding: "5px 10px" }}>
+                        {existing?.last5?.length ? "Edit" : "+ Add Form"}
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditing && (
+                    <div>
+                      <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Enter matches oldest → newest. Result auto-fills from score.</p>
+                      <div style={{ display: "grid", gap: "6px" }}>
+                        {editingMatches.map((m, i) => (
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "80px 1fr 60px 32px 12px 32px 60px auto", gap: "5px", alignItems: "center" }}>
+                            <input type="date" value={m.date} onChange={e => updateMatch(i, "date", e.target.value)} style={{ fontSize: "11px", padding: "5px 6px" }} />
+                            <input type="text" placeholder="Opponent" value={m.opponent} onChange={e => updateMatch(i, "opponent", e.target.value)} style={{ fontSize: "11px", padding: "5px 6px" }} />
+                            <input type="text" placeholder="Competition" value={m.competition} onChange={e => updateMatch(i, "competition", e.target.value)} style={{ fontSize: "11px", padding: "5px 6px" }} />
+                            <input type="number" min={0} max={20} value={m.goalsFor} onChange={e => updateMatch(i, "goalsFor", parseInt(e.target.value) || 0)} style={{ fontSize: "13px", padding: "5px 4px", textAlign: "center" }} />
+                            <span style={{ textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>–</span>
+                            <input type="number" min={0} max={20} value={m.goalsAgainst} onChange={e => updateMatch(i, "goalsAgainst", parseInt(e.target.value) || 0)} style={{ fontSize: "13px", padding: "5px 4px", textAlign: "center" }} />
+                            <select value={m.homeAway} onChange={e => updateMatch(i, "homeAway", e.target.value)} style={{ fontSize: "11px", padding: "5px 6px" }}>
+                              <option value="H">Home</option>
+                              <option value="A">Away</option>
+                            </select>
+                            <span style={{ width: 22, height: 22, borderRadius: "3px", background: RESULT_COLORS[m.result], color: "white", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {m.result}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                        <button className="btn-primary" onClick={saveForm} style={{ fontSize: "12px" }}>Save</button>
+                        <button className="btn-secondary" onClick={() => setEditingTeam(null)} style={{ fontSize: "12px" }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -30,14 +30,15 @@ export async function GET(request: NextRequest) {
   if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 503 });
 
   try {
-    // Free plan doesn't support &last= — use date range instead
+    // Free plan requires season parameter alongside date range
     const toDate = new Date();
     const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - 180); // last 6 months
+    fromDate.setDate(fromDate.getDate() - 180);
     const from = fromDate.toISOString().split("T")[0];
     const to = toDate.toISOString().split("T")[0];
+    const season = toDate.getFullYear();
 
-    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=${from}&to=${to}`;
+    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${season}&from=${from}&to=${to}`;
     const res = await fetch(url, {
       headers: {
         "x-apisports-key": apiKey,
