@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// API-Football national team IDs
 const TEAM_ID_MAP: Record<string, number> = {
   "Mexico": 16, "South Africa": 18, "South Korea": 21, "Czechia": 40,
   "Canada": 101, "Bosnia & Herzegovina": 17, "Qatar": 163, "Switzerland": 15,
@@ -16,88 +15,87 @@ const TEAM_ID_MAP: Record<string, number> = {
   "England": 10, "Croatia": 3, "Ghana": 28, "Panama": 100,
 };
 
+// Completed fixture statuses in API-Football v3
+const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "FT_PEN", "AWD", "WO"]);
+
 export async function GET(request: NextRequest) {
   const team = request.nextUrl.searchParams.get("team");
-
-  if (!team) {
-    return NextResponse.json({ error: "Missing team parameter" }, { status: 400 });
-  }
+  if (!team) return NextResponse.json({ error: "Missing team" }, { status: 400 });
 
   const teamId = TEAM_ID_MAP[team];
-  if (!teamId) {
-    return NextResponse.json({ error: `Unknown team: ${team}` }, { status: 404 });
-  }
+  if (!teamId) return NextResponse.json({ error: `Unknown team: ${team}` }, { status: 404 });
 
   const apiKey = process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 503 });
-  }
+  if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 503 });
 
   try {
-    const res = await fetch(
-      `https://v3.football.api-sports.io/fixtures?team=${teamId}&last=5&status=FT`,
-      {
-        headers: {
-          "x-apisports-key": apiKey,
-          "x-rapidapi-host": "v3.football.api-sports.io",
-        },
-        // Vercel edge cache: revalidate every 24 hours
-        next: { revalidate: 86400 },
-      }
-    );
+    // Fetch last 10 to give us enough to find 5 finished ones
+    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&last=10`;
+    const res = await fetch(url, {
+      headers: {
+        "x-apisports-key": apiKey,
+        "x-rapidapi-host": "v3.football.api-sports.io",
+      },
+      next: { revalidate: 86400 },
+    });
 
     if (!res.ok) {
-      return NextResponse.json(
-        { error: `API-Football error: ${res.status}` },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: `API error: ${res.status}` }, { status: 502 });
     }
 
     const data = await res.json();
-    const fixtures = data.response || [];
 
-    const last5 = fixtures
-      .slice(-5)
-      .reverse()
-      .map((f: Record<string, unknown>) => {
-        const fixture = f.fixture as Record<string, unknown>;
-        const teams = f.teams as Record<string, Record<string, unknown>>;
-        const goals = f.goals as Record<string, number | null>;
-        const league = f.league as Record<string, unknown>;
-
-        const isHome = Number((teams.home as Record<string, unknown>).id) === teamId;
-        const opponentInfo = isHome ? teams.away : teams.home;
-        const gf = isHome ? (goals.home ?? 0) : (goals.away ?? 0);
-        const ga = isHome ? (goals.away ?? 0) : (goals.home ?? 0);
-        const result: "W" | "D" | "L" = gf > ga ? "W" : gf < ga ? "L" : "D";
-
-        return {
-          date: ((fixture.date as string) || "").split("T")[0],
-          opponent: String((opponentInfo as Record<string, unknown>).name || ""),
-          homeAway: isHome ? "H" : "A",
-          goalsFor: Number(gf),
-          goalsAgainst: Number(ga),
-          result,
-          competition: String((league as Record<string, unknown>).name || ""),
-        };
+    // Debug: return raw response info if no fixtures
+    if (!data.response || data.response.length === 0) {
+      return NextResponse.json({
+        teamName: team, teamId, last5: [], fetchedAt: Date.now(),
+        debug: { errors: data.errors, results: data.results, paging: data.paging }
       });
+    }
 
-    const response = NextResponse.json({
-      teamName: team,
-      teamId,
-      last5,
-      fetchedAt: Date.now(),
+    // Filter to only finished matches
+    const finished = (data.response as Record<string, unknown>[])
+      .filter(f => {
+        const fixture = f.fixture as Record<string, unknown>;
+        const status = (fixture.status as Record<string, unknown>)?.short as string;
+        return FINISHED_STATUSES.has(status);
+      })
+      .slice(-5)
+      .reverse();
+
+    const last5 = finished.map(f => {
+      const fixture = f.fixture as Record<string, unknown>;
+      const teams = f.teams as Record<string, Record<string, unknown>>;
+      const goals = f.goals as Record<string, number | null>;
+      const league = f.league as Record<string, unknown>;
+
+      const isHome = Number((teams.home as Record<string, unknown>).id) === teamId;
+      const opponent = isHome ? teams.away : teams.home;
+      const gf = Number(isHome ? (goals.home ?? 0) : (goals.away ?? 0));
+      const ga = Number(isHome ? (goals.away ?? 0) : (goals.home ?? 0));
+      const result: "W" | "D" | "L" = gf > ga ? "W" : gf < ga ? "L" : "D";
+      const status = (fixture.status as Record<string, unknown>)?.short as string;
+
+      return {
+        date: ((fixture.date as string) || "").split("T")[0],
+        opponent: String((opponent as Record<string, unknown>).name || ""),
+        homeAway: isHome ? "H" as const : "A" as const,
+        goalsFor: gf,
+        goalsAgainst: ga,
+        result,
+        competition: String((league as Record<string, unknown>).name || ""),
+        status,
+      };
     });
 
-    // Tell Vercel CDN to cache for 24 hours, allow stale for 1 hour while revalidating
-    response.headers.set(
-      "Cache-Control",
-      "public, s-maxage=86400, stale-while-revalidate=3600"
-    );
+    const response = NextResponse.json({
+      teamName: team, teamId, last5, fetchedAt: Date.now(),
+    });
 
+    response.headers.set("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600");
     return response;
+
   } catch (err) {
-    console.error(`Form API error for ${team}:`, err);
-    return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
