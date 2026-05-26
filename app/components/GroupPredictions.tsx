@@ -4,6 +4,7 @@ import { Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
 import Flag from "./Flag";
+import TeamFormBadge from "./TeamFormBadge";
 
 interface Props {
   player: Player;
@@ -114,6 +115,20 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "7px" }}>
                       <span style={{ fontSize: "11px", color: "var(--text-3)" }}>📅 {match.dateUK} · {match.timeUK}</span>
                       <span style={{ fontSize: "11px", color: "var(--text-3)" }}>🏟️ {match.stadium}, {match.city}</span>
+                    </div>
+                    {/* Inline form row */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Flag country={match.home.team} size={14} />
+                        <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{match.home.team}</span>
+                        <TeamFormBadge teamName={match.home.team} inline />
+                      </div>
+                      <span style={{ fontSize: "10px", color: "var(--text-3)" }}>vs</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexDirection: "row-reverse" }}>
+                        <Flag country={match.away.team} size={14} />
+                        <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{match.away.team}</span>
+                        <TeamFormBadge teamName={match.away.team} inline />
+                      </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ flex: 1, textAlign: "right", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
