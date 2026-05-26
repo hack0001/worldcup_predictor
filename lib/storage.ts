@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
-import { Player, AdminState, FantasySquad, PlayerStat, FANTASY_POINTS } from "@/app/data/types";
-import { POINTS } from "@/app/data/worldcup";
+import { Player, AdminState, FantasySquad, PlayerStat, POINTS, FANTASY_POINTS, KnockoutResult } from "@/app/data/types";
+import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES } from "@/app/data/worldcup";
 
 const CURRENT_USER_KEY = "wc2026_current";
 
@@ -8,7 +8,6 @@ export function getCurrentUserId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(CURRENT_USER_KEY);
 }
-
 export function setCurrentUserId(id: string | null) {
   if (id) localStorage.setItem(CURRENT_USER_KEY, id);
   else localStorage.removeItem(CURRENT_USER_KEY);
@@ -19,17 +18,14 @@ export async function getPlayers(): Promise<Player[]> {
   const { data } = await supabase.from("players").select("*");
   return (data || []).map(dbToPlayer);
 }
-
 export async function getPlayer(id: string): Promise<Player | null> {
   const { data } = await supabase.from("players").select("*").eq("id", id).single();
   return data ? dbToPlayer(data) : null;
 }
-
 export async function getPlayerByEmail(email: string): Promise<Player | null> {
   const { data } = await supabase.from("players").select("*").eq("email", email.toLowerCase()).single();
   return data ? dbToPlayer(data) : null;
 }
-
 export async function savePlayer(player: Player): Promise<void> {
   await supabase.from("players").upsert({
     id: player.id, name: player.name, email: player.email.toLowerCase(),
@@ -37,11 +33,11 @@ export async function savePlayer(player: Player): Promise<void> {
     avatar_url: player.avatarUrl || "",
     tournament_winner: player.tournamentWinner || "",
     player_of_tournament: player.playerOfTournament || "",
-    group_predictions: player.groupPredictions, knockout_predictions: player.knockoutPredictions,
+    group_predictions: player.groupPredictions,
+    knockout_predictions: player.knockoutPredictions,
     created_at: player.createdAt,
   });
 }
-
 function dbToPlayer(data: Record<string, unknown>): Player {
   return {
     id: data.id as string, name: data.name as string, email: data.email as string,
@@ -56,14 +52,13 @@ function dbToPlayer(data: Record<string, unknown>): Player {
   };
 }
 
-// ── Avatar Upload ─────────────────────────────────────────
+// ── Avatar ────────────────────────────────────────────────
 export async function uploadAvatar(playerId: string, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${playerId}.${ext}`;
   const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
   if (error) { console.error("Avatar upload error:", error); return null; }
   const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-  // Add cache-bust so updated images show immediately
   return `${data.publicUrl}?t=${Date.now()}`;
 }
 
@@ -82,38 +77,32 @@ export async function getAdminState(): Promise<AdminState> {
     lockTime: data.lock_time || null,
   };
 }
-
 export async function saveAdminState(state: AdminState): Promise<void> {
   await supabase.from("admin_state").upsert({
-    id: 1, results: state.results, top_scorer: state.topScorer, top_assist: state.topAssist,
+    id: 1, results: state.results,
+    top_scorer: state.topScorer, top_assist: state.topAssist,
     tournament_winner: state.tournamentWinner || "",
     player_of_tournament: state.playerOfTournament || "",
     predictions_locked: state.predictionsLocked,
     lock_time: state.lockTime,
   });
 }
-
-// ── Lock check ────────────────────────────────────────────
 export function isPredictionLocked(adminState: AdminState): boolean {
   if (adminState.predictionsLocked) return true;
-  if (adminState.lockTime) {
-    return new Date() >= new Date(adminState.lockTime);
-  }
+  if (adminState.lockTime) return new Date() >= new Date(adminState.lockTime);
   return false;
 }
 
-// ── Fantasy Squads ────────────────────────────────────────
+// ── Fantasy ───────────────────────────────────────────────
 export async function getFantasySquad(playerId: string): Promise<FantasySquad | null> {
   const { data } = await supabase.from("fantasy_squads").select("*").eq("player_id", playerId).single();
   if (!data) return null;
   return { id: data.id, playerId: data.player_id, squad: data.squad || [], round: data.round, updatedAt: data.updated_at };
 }
-
 export async function getAllFantasySquads(): Promise<FantasySquad[]> {
   const { data } = await supabase.from("fantasy_squads").select("*");
-  return (data || []).map((d) => ({ id: d.id, playerId: d.player_id, squad: d.squad || [], round: d.round, updatedAt: d.updated_at }));
+  return (data || []).map(d => ({ id: d.id, playerId: d.player_id, squad: d.squad || [], round: d.round, updatedAt: d.updated_at }));
 }
-
 export async function saveFantasySquad(squad: FantasySquad): Promise<void> {
   await supabase.from("fantasy_squads").upsert({ id: squad.playerId, player_id: squad.playerId, squad: squad.squad, round: squad.round, updated_at: new Date().toISOString() });
 }
@@ -121,9 +110,14 @@ export async function saveFantasySquad(squad: FantasySquad): Promise<void> {
 // ── Player Stats ──────────────────────────────────────────
 export async function getAllPlayerStats(): Promise<PlayerStat[]> {
   const { data } = await supabase.from("player_stats").select("*");
-  return (data || []).map(dbToStat);
+  return (data || []).map(d => ({
+    id: d.id as string, playerName: d.player_name as string, country: d.country as string,
+    goals: (d.goals as number) || 0, assists: (d.assists as number) || 0,
+    cleanSheets: (d.clean_sheets as number) || 0, yellowCards: (d.yellow_cards as number) || 0,
+    redCards: (d.red_cards as number) || 0, saves: (d.saves as number) || 0,
+    minutesPlayed: (d.minutes_played as number) || 0, round: d.round as string,
+  }));
 }
-
 export async function savePlayerStat(stat: PlayerStat): Promise<void> {
   await supabase.from("player_stats").upsert({
     id: stat.id, player_name: stat.playerName, country: stat.country,
@@ -132,61 +126,183 @@ export async function savePlayerStat(stat: PlayerStat): Promise<void> {
     minutes_played: stat.minutesPlayed, round: stat.round,
   });
 }
-
 export async function deletePlayerStat(id: string): Promise<void> {
   await supabase.from("player_stats").delete().eq("id", id);
 }
 
-function dbToStat(data: Record<string, unknown>): PlayerStat {
-  return {
-    id: data.id as string, playerName: data.player_name as string, country: data.country as string,
-    goals: (data.goals as number) || 0, assists: (data.assists as number) || 0,
-    cleanSheets: (data.clean_sheets as number) || 0, yellowCards: (data.yellow_cards as number) || 0,
-    redCards: (data.red_cards as number) || 0, saves: (data.saves as number) || 0,
-    minutesPlayed: (data.minutes_played as number) || 0, round: data.round as string,
-  };
+// ── Group standings helper ────────────────────────────────
+function calcGroupStandings(group: string, groupResults: AdminState["results"]["group"]) {
+  const teams = GROUPS[group];
+  const s: Record<string, { pts: number; gd: number; gf: number }> = {};
+  teams.forEach(t => { s[t.team] = { pts: 0, gd: 0, gf: 0 }; });
+  for (const m of GROUP_MATCHES.filter(m => m.group === group)) {
+    const r = groupResults[m.id];
+    if (!r || r.home === "" || r.away === "") continue;
+    const h = parseInt(r.home), a = parseInt(r.away);
+    if (isNaN(h) || isNaN(a)) continue;
+    s[m.home.team].gf += h; s[m.away.team].gf += a;
+    s[m.home.team].gd += h - a; s[m.away.team].gd += a - h;
+    if (h > a) { s[m.home.team].pts += 3; }
+    else if (a > h) { s[m.away.team].pts += 3; }
+    else { s[m.home.team].pts++; s[m.away.team].pts++; }
+  }
+  return Object.entries(s)
+    .sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+    .map(([team]) => team);
 }
 
-// ── Points Calculators ────────────────────────────────────
-export function calculatePlayerPoints(player: Player, adminState: AdminState): number {
+function isGroupComplete(group: string, groupResults: AdminState["results"]["group"]) {
+  return GROUP_MATCHES.filter(m => m.group === group).every(m => {
+    const r = groupResults[m.id];
+    return r && r.home !== "" && r.away !== "";
+  });
+}
+
+// Which round does a knockout match belong to?
+function getKnockoutRound(matchId: string): "early" | "late" {
+  const earlyRounds = ["r32", "r16"];
+  for (const r of earlyRounds) {
+    if (KNOCKOUT_MATCHES[r]?.some(m => m.id === matchId)) return "early";
+  }
+  return "late";
+}
+
+// What position (qf/sf/final) is this match?
+function getKnockoutStage(matchId: string): "r32" | "r16" | "qf" | "sf" | "final" | null {
+  for (const [round, matches] of Object.entries(KNOCKOUT_MATCHES)) {
+    if (matches.some(m => m.id === matchId)) return round as "r32" | "r16" | "qf" | "sf" | "final";
+  }
+  return null;
+}
+
+// ── Main points calculator ────────────────────────────────
+export function calculatePlayerPoints(player: Player, adminState: AdminState): { total: number; breakdown: Record<string, number> } {
   let total = 0;
-  const results = adminState.results;
+  const breakdown: Record<string, number> = {};
+  const add = (key: string, pts: number) => { if (pts) { breakdown[key] = (breakdown[key] || 0) + pts; total += pts; } };
+  const gr = adminState.results.group;
+  const kr = adminState.results.knockout;
+
+  // ── Group stage match results ──
   for (const [matchId, pred] of Object.entries(player.groupPredictions)) {
-    const actual = results.group[matchId];
+    const actual = gr[matchId];
     if (!actual) continue;
     const [ph, pa, ah, aa] = [parseInt(pred.home), parseInt(pred.away), parseInt(actual.home), parseInt(actual.away)];
     if (isNaN(ph) || isNaN(pa) || isNaN(ah) || isNaN(aa)) continue;
-    if (ph === ah && pa === aa) { total += POINTS.EXACT_SCORE; continue; }
-    const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
-    const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
-    if (pr === ar) total += POINTS.CORRECT_RESULT;
+    if (ph === ah && pa === aa) {
+      add("Group correct scores", POINTS.GROUP_CORRECT_SCORE);
+    } else {
+      const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
+      const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
+      if (pr === ar) add("Group correct results", POINTS.GROUP_CORRECT_RESULT);
+    }
   }
+
+  // ── Group winners / runners-up / 3rd ──
+  for (const group of Object.keys(GROUPS)) {
+    if (!isGroupComplete(group, gr)) continue;
+    const standings = calcGroupStandings(group, gr);
+    const [first, second, third] = standings;
+    // Find what player predicted for this group
+    const groupMatches = GROUP_MATCHES.filter(m => m.group === group);
+    // We infer from predictions: who does player have winning most matches?
+    // Simpler: check player's prediction for the group winner by scanning all match results
+    // Actually — for group positions we compare admin standings vs player's implied standings
+    // Player implied standings from their own predictions
+    const pStandings = calcGroupStandings(group, Object.fromEntries(
+      groupMatches.map(m => [m.id, { home: player.groupPredictions[m.id]?.home || "", away: player.groupPredictions[m.id]?.away || "" }])
+    ));
+    if (pStandings[0] === first) add("Correct group winners", POINTS.GROUP_CORRECT_WINNER);
+    if (pStandings[1] === second) add("Correct group runners-up", POINTS.GROUP_CORRECT_RUNNER_UP);
+    if (pStandings[2] === third) add("Correct 3rd place", POINTS.GROUP_CORRECT_THIRD);
+  }
+
+  // ── Knockout matches ──
   for (const [matchId, pred] of Object.entries(player.knockoutPredictions)) {
-    const actual = results.knockout[matchId];
-    if (!actual) continue;
-    const [ph, pa, ah, aa] = [parseInt(pred.homeScore), parseInt(pred.awayScore), parseInt(actual.homeScore), parseInt(actual.awayScore)];
-    if (isNaN(ph) || isNaN(pa) || isNaN(ah) || isNaN(aa)) continue;
-    if (ph === ah && pa === aa) { total += POINTS.EXACT_SCORE; continue; }
-    const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
-    const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
-    if (pr === ar) total += POINTS.CORRECT_RESULT;
+    const actual = kr[matchId];
+    if (!actual || !actual.homeTeam) continue;
+
+    const stage = getKnockoutStage(matchId);
+    const isEarly = stage === "r32" || stage === "r16";
+    const isLate = stage === "qf" || stage === "sf" || stage === "final";
+
+    const ph = parseInt(pred.homeScore), pa = parseInt(pred.awayScore);
+    const ah = parseInt(actual.homeScore), aa = parseInt(actual.awayScore);
+    const validScores = !isNaN(ph) && !isNaN(pa) && !isNaN(ah) && !isNaN(aa);
+
+    if (validScores) {
+      const exactScore = ph === ah && pa === aa;
+      const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
+      const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
+      const correctResult = pr === ar;
+
+      if (isEarly) {
+        if (exactScore) add("KO correct scores (R32/R16)", POINTS.EARLY_KO_CORRECT_SCORE);
+        else if (correctResult) add("KO correct results (R32/R16)", POINTS.EARLY_KO_CORRECT_RESULT);
+      } else if (isLate) {
+        if (exactScore) add("KO correct scores (QF/SF/Final)", POINTS.LATE_KO_CORRECT_SCORE);
+        else if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
+      }
+    }
+
+    // ET prediction
+    if (actual.wentToET !== undefined) {
+      if (pred.goesToET === actual.wentToET) add("Predicts extra time", POINTS.PREDICTS_ET);
+      if (actual.wentToET && pred.goesToET) {
+        const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
+        const aeh = parseInt(actual.etHomeScore), aea = parseInt(actual.etAwayScore);
+        if (!isNaN(eh) && !isNaN(ea) && !isNaN(aeh) && !isNaN(aea) && eh === aeh && ea === aea) {
+          add("Correct ET score", POINTS.CORRECT_ET_SCORE);
+        }
+      }
+    }
+
+    // Penalties prediction
+    if (actual.wentToPens !== undefined) {
+      if (pred.goesToPens === actual.wentToPens) add("Predicts penalties", POINTS.PREDICTS_PENS);
+      if (actual.wentToPens && pred.goesToPens && pred.penWinner && actual.penWinner) {
+        if (pred.penWinner === actual.penWinner) add("Correct penalty winner", POINTS.CORRECT_PEN_WINNER);
+      }
+    }
+
+    // Correct qualifier
+    const winner = actual.wentToPens
+      ? actual.penWinner
+      : actual.wentToET
+        ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
+        : (parseInt(actual.homeScore) > parseInt(actual.awayScore) ? actual.homeTeam : actual.awayTeam);
+
+    const predWinner = pred.goesToPens
+      ? pred.penWinner
+      : pred.goesToET
+        ? (parseInt(pred.etHomeScore) > parseInt(pred.etAwayScore) ? pred.homeTeam : pred.awayTeam)
+        : (parseInt(pred.homeScore) > parseInt(pred.awayScore) ? pred.homeTeam : pred.awayTeam);
+
+    if (winner && predWinner && winner === predWinner) {
+      if (isEarly) add("Correct qualifier (R32/R16)", POINTS.EARLY_KO_CORRECT_QUALIFIER);
+      if (stage === "qf") add("Correct quarter-finalist", POINTS.CORRECT_QUARTER_FINALIST);
+      if (stage === "sf") add("Correct semi-finalist", POINTS.CORRECT_SEMI_FINALIST);
+      if (stage === "final") add("Correct finalist", POINTS.CORRECT_FINALIST);
+    }
   }
-  if (adminState.topScorer && player.topScorer === adminState.topScorer) total += 15;
-  if (adminState.topAssist && player.topAssist === adminState.topAssist) total += 10;
-  if (adminState.tournamentWinner && player.tournamentWinner === adminState.tournamentWinner) total += 25;
-  if (adminState.playerOfTournament && player.playerOfTournament === adminState.playerOfTournament) total += 20;
-  return total;
+
+  // ── Tournament awards ──
+  if (adminState.topScorer && player.topScorer === adminState.topScorer) add("Golden Boot", POINTS.GOLDEN_BOOT);
+  if (adminState.topAssist && player.topAssist === adminState.topAssist) add("Top Assist", POINTS.TOP_ASSIST);
+  if (adminState.playerOfTournament && player.playerOfTournament === adminState.playerOfTournament) add("Player of Tournament", POINTS.PLAYER_OF_TOURNAMENT);
+  if (adminState.tournamentWinner && player.tournamentWinner === adminState.tournamentWinner) add("Tournament Winner", POINTS.TOURNAMENT_WINNER);
+
+  return { total, breakdown };
 }
 
+// ── Fantasy points ────────────────────────────────────────
 export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[]): number {
   let total = 0;
   for (const fp of squad.squad) {
-    const playerStats = stats.filter((s) => s.playerName === fp.name);
-    for (const s of playerStats) {
+    for (const s of stats.filter(s => s.playerName === fp.name)) {
       if (fp.position === "FWD") total += s.goals * FANTASY_POINTS.GOAL_FWD;
       else if (fp.position === "MID") total += s.goals * FANTASY_POINTS.GOAL_MID;
-      else if (fp.position === "DEF") total += s.goals * FANTASY_POINTS.GOAL_DEF;
-      else if (fp.position === "GK") total += s.goals * FANTASY_POINTS.GOAL_GK;
+      else total += s.goals * FANTASY_POINTS.GOAL_DEF;
       total += s.assists * FANTASY_POINTS.ASSIST;
       if (fp.position === "GK" || fp.position === "DEF") total += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF;
       else if (fp.position === "MID") total += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_MID;

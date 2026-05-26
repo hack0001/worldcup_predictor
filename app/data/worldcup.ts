@@ -313,7 +313,4 @@ export const SQUADS: Record<string, { flag: string; players: string[] }> = {
   "Portugal (squad)": { flag: "pt", players: [] },
 };
 
-export const POINTS = {
-  EXACT_SCORE: 10,
-  CORRECT_RESULT: 6,
-};
+// POINTS are defined in types.ts

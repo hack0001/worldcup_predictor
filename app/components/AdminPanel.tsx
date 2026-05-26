@@ -95,10 +95,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           const second = sorted[1][0];
           const { first: firstSlot, second: secondSlot } = GROUP_TO_R32[group];
 
-          const firstMatch = newKnockout[firstSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+          const firstMatch = newKnockout[firstSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "", wentToET: false, etHomeScore: "", etAwayScore: "", wentToPens: false, penWinner: "" };
           newKnockout[firstSlot.matchId] = { ...firstMatch, [firstSlot.role === "home" ? "homeTeam" : "awayTeam"]: first };
 
-          const secondMatch = newKnockout[secondSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+          const secondMatch = newKnockout[secondSlot.matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "", wentToET: false, etHomeScore: "", etAwayScore: "", wentToPens: false, penWinner: "" };
           newKnockout[secondSlot.matchId] = { ...secondMatch, [secondSlot.role === "home" ? "homeTeam" : "awayTeam"]: second };
         }
       }
@@ -107,38 +107,38 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
     });
   };
 
-  const updateKnockoutResult = (matchId: string, field: string, value: string) => {
-    const isScore = field === "homeScore" || field === "awayScore";
-    const v = isScore ? value.replace(/\D/g, "").slice(0, 2) : value;
-    const current = localState.results.knockout[matchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+  const updateKnockoutResult = (matchId: string, field: string, value: string | boolean) => {
+    const isScore = ["homeScore", "awayScore", "etHomeScore", "etAwayScore"].includes(field);
+    const v = isScore && typeof value === "string" ? value.replace(/\D/g, "").slice(0, 2) : value;
+    const current = localState.results.knockout[matchId] || { ...EMPTY_KO_RESULT };
     const updated = { ...current, [field]: v };
-    
-    // Auto-populate next round teams when a winner is entered
+
     const newKnockout = { ...localState.results.knockout, [matchId]: updated };
-    
-    // Find if this match feeds into a next round match
+
+    // Auto-populate next round: determine winner based on pens > ET > normal time
     for (const [nextMatchId, feedMatches] of Object.entries(BRACKET_PROGRESSION)) {
       const feedList = feedMatches.split(",");
-      if (feedList.includes(matchId)) {
-        const nextMatch = newKnockout[nextMatchId] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
-        // Determine winner of this match
-        const home = parseInt(updated.homeScore);
-        const away = parseInt(updated.awayScore);
-        if (!isNaN(home) && !isNaN(away) && updated.homeTeam && updated.awayTeam) {
-          const winner = home > away ? updated.homeTeam : away > home ? updated.awayTeam : "";
-          if (winner) {
-            const isFirstFeed = feedList[0] === matchId;
-            newKnockout[nextMatchId] = {
-              ...nextMatch,
-              homeTeam: isFirstFeed ? winner : nextMatch.homeTeam,
-              awayTeam: !isFirstFeed ? winner : nextMatch.awayTeam,
-            };
-          }
+      if (!feedList.includes(matchId)) continue;
+      const nextMatch = newKnockout[nextMatchId] || { ...EMPTY_KO_RESULT };
+      let winner = "";
+      if (updated.wentToPens && updated.penWinner) {
+        winner = updated.penWinner;
+      } else if (updated.wentToET) {
+        const h = parseInt(updated.etHomeScore), a = parseInt(updated.etAwayScore);
+        if (!isNaN(h) && !isNaN(a) && h !== a) winner = h > a ? updated.homeTeam : updated.awayTeam;
+      } else {
+        const h = parseInt(updated.homeScore), a = parseInt(updated.awayScore);
+        if (!isNaN(h) && !isNaN(a) && updated.homeTeam && updated.awayTeam) {
+          winner = h > a ? updated.homeTeam : a > h ? updated.awayTeam : "";
         }
+      }
+      if (winner) {
+        const isFirstFeed = feedList[0] === matchId;
+        newKnockout[nextMatchId] = { ...nextMatch, homeTeam: isFirstFeed ? winner : nextMatch.homeTeam, awayTeam: !isFirstFeed ? winner : nextMatch.awayTeam };
       }
     }
 
-    setLocalState((s) => ({ ...s, results: { ...s.results, knockout: newKnockout } }));
+    setLocalState(s => ({ ...s, results: { ...s.results, knockout: newKnockout } }));
   };
 
   const saveResults = async () => {
@@ -191,6 +191,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
     );
   }
 
+  const EMPTY_KO_RESULT = { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "", wentToET: false, etHomeScore: "", etAwayScore: "", wentToPens: false, penWinner: "" };
   const knockoutRoundTabs: { id: "r32" | "r16" | "qf" | "sf" | "final"; label: string }[] = [
     { id: "r32", label: "Round of 32" }, { id: "r16", label: "Last 16" },
     { id: "qf", label: "Quarters" }, { id: "sf", label: "Semis" }, { id: "final", label: "Final" },
@@ -347,25 +348,60 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               </div>
               <div style={{ display: "grid", gap: "8px" }}>
                 {KNOCKOUT_MATCHES[activeKnockoutRound].map((match) => {
-                  const res = localState.results.knockout[match.id] || { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "" };
+                  const res = localState.results.knockout[match.id] || { ...EMPTY_KO_RESULT };
                   return (
-                    <div key={match.id} className="card" style={{ padding: "12px 14px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <div key={match.id} className="card" style={{ padding: "14px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                         <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase" }}>{match.label}</p>
-                        <p style={{ fontSize: "11px", color: "var(--text-3)" }}>📅 {match.dateUK} · {match.timeUK} · 🏟️ {match.stadium}</p>
+                        <p style={{ fontSize: "11px", color: "var(--text-3)" }}>📅 {match.dateUK} · {match.timeUK}</p>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+
+                      {/* Teams + normal time score */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                           {res.homeTeam && <Flag country={res.homeTeam} size={16} />}
-                          <input type="text" placeholder="Home Team" value={res.homeTeam} onChange={(e) => updateKnockoutResult(match.id, "homeTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
+                          <input type="text" placeholder="Home Team" value={res.homeTeam} onChange={e => updateKnockoutResult(match.id, "homeTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
                         </div>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.homeScore} onChange={(e) => updateKnockoutResult(match.id, "homeScore", e.target.value)} />
+                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.homeScore} onChange={e => updateKnockoutResult(match.id, "homeScore", e.target.value)} />
                         <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.awayScore} onChange={(e) => updateKnockoutResult(match.id, "awayScore", e.target.value)} />
+                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.awayScore} onChange={e => updateKnockoutResult(match.id, "awayScore", e.target.value)} />
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                           {res.awayTeam && <Flag country={res.awayTeam} size={16} />}
-                          <input type="text" placeholder="Away Team" value={res.awayTeam} onChange={(e) => updateKnockoutResult(match.id, "awayTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
+                          <input type="text" placeholder="Away Team" value={res.awayTeam} onChange={e => updateKnockoutResult(match.id, "awayTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
                         </div>
+                      </div>
+
+                      {/* ET checkbox */}
+                      <div style={{ borderTop: "1px solid var(--border)", paddingTop: "8px" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "12px", marginBottom: res.wentToET ? "8px" : 0 }}>
+                          <input type="checkbox" checked={!!res.wentToET} onChange={e => updateKnockoutResult(match.id, "wentToET", e.target.checked)} style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
+                          Went to extra time?
+                        </label>
+                        {res.wentToET && (
+                          <div style={{ paddingLeft: "22px" }}>
+                            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>Score after extra time (cumulative)</p>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                              <span style={{ fontSize: "11px", minWidth: "60px", textAlign: "right", color: "var(--text-2)" }}>{res.homeTeam || "Home"}</span>
+                              <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.etHomeScore} onChange={e => updateKnockoutResult(match.id, "etHomeScore", e.target.value)} />
+                              <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
+                              <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.etAwayScore} onChange={e => updateKnockoutResult(match.id, "etAwayScore", e.target.value)} />
+                              <span style={{ fontSize: "11px", color: "var(--text-2)" }}>{res.awayTeam || "Away"}</span>
+                            </div>
+                            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "12px", marginBottom: res.wentToPens ? "8px" : 0 }}>
+                              <input type="checkbox" checked={!!res.wentToPens} onChange={e => updateKnockoutResult(match.id, "wentToPens", e.target.checked)} style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
+                              Went to penalties?
+                            </label>
+                            {res.wentToPens && (
+                              <div style={{ paddingLeft: "22px" }}>
+                                <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>Penalty winner</p>
+                                <select value={res.penWinner} onChange={e => updateKnockoutResult(match.id, "penWinner", e.target.value)} style={{ fontSize: "12px", padding: "6px 8px" }}>
+                                  <option value="">-- Select winner --</option>
+                                  {[res.homeTeam, res.awayTeam].filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
