@@ -25,12 +25,19 @@ export async function GET(request: NextRequest) {
   const teamId = TEAM_ID_MAP[team];
   if (!teamId) return NextResponse.json({ error: `Unknown team: ${team}` }, { status: 404 });
 
-  const apiKey = process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
+  // Try server-only key first, fall back to public key
+  const apiKey = process.env.FOOTBALL_API_KEY || process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 503 });
 
   try {
-    // Fetch last 10 to give us enough to find 5 finished ones
-    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&last=10`;
+    // Free plan doesn't support &last= — use date range instead
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 180); // last 6 months
+    const from = fromDate.toISOString().split("T")[0];
+    const to = toDate.toISOString().split("T")[0];
+
+    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=${from}&to=${to}`;
     const res = await fetch(url, {
       headers: {
         "x-apisports-key": apiKey,
@@ -53,15 +60,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Filter to only finished matches
+    // Filter to finished, sort by date desc, take last 5
     const finished = (data.response as Record<string, unknown>[])
       .filter(f => {
         const fixture = f.fixture as Record<string, unknown>;
         const status = (fixture.status as Record<string, unknown>)?.short as string;
         return FINISHED_STATUSES.has(status);
       })
-      .slice(-5)
-      .reverse();
+      .sort((a, b) => {
+        const da = ((a.fixture as Record<string, unknown>).date as string) || "";
+        const db = ((b.fixture as Record<string, unknown>).date as string) || "";
+        return db.localeCompare(da); // newest first
+      })
+      .slice(0, 5)
+      .reverse(); // show oldest→newest for form display
 
     const last5 = finished.map(f => {
       const fixture = f.fixture as Record<string, unknown>;
