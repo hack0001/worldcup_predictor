@@ -1,10 +1,9 @@
-// Fetches team form from our own Supabase team_form table
-// Admin enters this manually in the admin panel
+// Team form stored in Supabase team_form table, entered by admin
 
 import { supabase } from "./supabase";
 
 export interface FormMatch {
-  date: string;       // "2026-06-01"
+  date: string;
   opponent: string;
   homeAway: "H" | "A";
   goalsFor: number;
@@ -19,23 +18,37 @@ export interface TeamForm {
   updatedAt: string;
 }
 
-// Client-side cache so we don't hammer Supabase on every render
-const memCache: Record<string, { form: TeamForm; at: number }> = {};
-const MEM_TTL = 5 * 60 * 1000; // 5 mins in memory
+// Module-level cache: team name → {form, fetchedAt}
+const cache: Record<string, { form: TeamForm | null; at: number }> = {};
+const TTL = 60 * 1000; // 1 minute — short so admin edits show quickly
+
+export function bustFormCache(teamName?: string) {
+  if (teamName) delete cache[teamName];
+  else Object.keys(cache).forEach(k => delete cache[k]);
+}
 
 export async function fetchTeamForm(teamName: string): Promise<TeamForm | null> {
-  // Memory cache
-  const cached = memCache[teamName];
-  if (cached && Date.now() - cached.at < MEM_TTL) return cached.form;
+  const hit = cache[teamName];
+  if (hit && Date.now() - hit.at < TTL) return hit.form;
 
   try {
+    // Use .eq + .maybeSingle() instead of .single() — returns null instead of error when no row
     const { data, error } = await supabase
       .from("team_form")
       .select("*")
       .eq("team", teamName)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) return null;
+    if (error) {
+      console.error("fetchTeamForm error:", teamName, error.message);
+      cache[teamName] = { form: null, at: Date.now() };
+      return null;
+    }
+
+    if (!data) {
+      cache[teamName] = { form: null, at: Date.now() };
+      return null;
+    }
 
     const form: TeamForm = {
       teamName,
@@ -43,29 +56,39 @@ export async function fetchTeamForm(teamName: string): Promise<TeamForm | null> 
       updatedAt: data.updated_at,
     };
 
-    memCache[teamName] = { form, at: Date.now() };
+    cache[teamName] = { form, at: Date.now() };
     return form;
-  } catch {
+  } catch (e) {
+    console.error("fetchTeamForm exception:", teamName, e);
+    cache[teamName] = { form: null, at: Date.now() };
     return null;
   }
 }
 
 export async function saveTeamForm(teamName: string, matches: FormMatch[]): Promise<void> {
-  await supabase.from("team_form").upsert({
+  const { error } = await supabase.from("team_form").upsert({
     team: teamName,
     matches,
     updated_at: new Date().toISOString(),
   });
-  // Bust memory cache
-  delete memCache[teamName];
+  if (error) console.error("saveTeamForm error:", teamName, error.message);
+  // Always bust cache after save
+  bustFormCache(teamName);
 }
 
 export async function getAllTeamForms(): Promise<Record<string, TeamForm>> {
-  const { data } = await supabase.from("team_form").select("*");
-  const result: Record<string, TeamForm> = {};
-  for (const row of data || []) {
-    result[row.team] = { teamName: row.team, last5: row.matches || [], updatedAt: row.updated_at };
+  try {
+    const { data, error } = await supabase.from("team_form").select("*");
+    if (error) { console.error("getAllTeamForms error:", error.message); return {}; }
+    const result: Record<string, TeamForm> = {};
+    for (const row of data || []) {
+      const form = { teamName: row.team, last5: row.matches || [], updatedAt: row.updated_at };
+      result[row.team] = form;
+      cache[row.team] = { form, at: Date.now() };
+    }
+    return result;
+  } catch (e) {
+    console.error("getAllTeamForms exception:", e);
+    return {};
   }
-  return result;
 }
-

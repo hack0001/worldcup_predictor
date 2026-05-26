@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
 import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer } from "@/lib/storage";
-import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm } from "@/lib/footballApi";
+import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm, bustFormCache } from "@/lib/footballApi";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
 
@@ -624,7 +624,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               const saveForm = async () => {
                 const validMatches = editingMatches.filter(m => m.opponent && m.date);
                 await saveTeamForm(team, validMatches);
-                setTeamForms({ ...teamForms, [team]: { teamName: team, last5: validMatches, updatedAt: new Date().toISOString() } });
+                bustFormCache(team);
+                // Refresh all forms so the UI updates immediately
+                const updated = await getAllTeamForms();
+                setTeamForms(updated);
                 setEditingTeam(null);
               };
 

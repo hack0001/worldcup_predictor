@@ -1,10 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
 import Flag from "./Flag";
-import TeamFormBadge from "./TeamFormBadge";
+import { getAllTeamForms, TeamForm } from "@/lib/footballApi";
+
+const RESULT_COLORS: Record<string, string> = { W: "#16a34a", D: "#ca8a04", L: "#dc2626" };
+
+function InlineForm({ form }: { form?: TeamForm }) {
+  if (!form?.last5?.length) return <span style={{ fontSize: "9px", color: "var(--text-3)" }}>–</span>;
+  return (
+    <div style={{ display: "flex", gap: "2px" }}>
+      {form.last5.map((m, i) => (
+        <span key={i} title={`${m.result} ${m.goalsFor}–${m.goalsAgainst} vs ${m.opponent}`} style={{ width: 14, height: 14, borderRadius: "2px", background: RESULT_COLORS[m.result] || "#999", color: "white", fontSize: 7, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {m.result}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 interface Props {
   player: Player;
@@ -14,6 +29,11 @@ interface Props {
 
 export default function GroupPredictions({ player, onUpdate, readonly }: Props) {
   const [activeGroup, setActiveGroup] = useState("A");
+  const [forms, setForms] = useState<Record<string, TeamForm>>({});
+
+  useEffect(() => {
+    getAllTeamForms().then(setForms);
+  }, []);
 
   const updateScore = async (matchId: string, side: "home" | "away", value: string) => {
     if (readonly) return;
@@ -118,16 +138,16 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
                     </div>
                     {/* Inline form row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Flag country={match.home.team} size={14} />
-                        <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{match.home.team}</span>
-                        <TeamFormBadge teamName={match.home.team} inline />
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                        <Flag country={match.home.team} size={13} />
+                        <span style={{ fontSize: "10px", color: "var(--text-3)" }}>{match.home.team}</span>
+                        <InlineForm form={forms[match.home.team]} />
                       </div>
                       <span style={{ fontSize: "10px", color: "var(--text-3)" }}>vs</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexDirection: "row-reverse" }}>
-                        <Flag country={match.away.team} size={14} />
-                        <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{match.away.team}</span>
-                        <TeamFormBadge teamName={match.away.team} inline />
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", flexDirection: "row-reverse" }}>
+                        <Flag country={match.away.team} size={13} />
+                        <span style={{ fontSize: "10px", color: "var(--text-3)" }}>{match.away.team}</span>
+                        <InlineForm form={forms[match.away.team]} />
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
