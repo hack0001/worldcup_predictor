@@ -1,8 +1,8 @@
 "use client";
-import { Player, FantasySquad, PlayerStat } from "@/app/data/types";
+import { Player, FantasySquad, PlayerStat, FANTASY_POINTS } from "@/app/data/types";
 import { calculateFantasyPoints } from "@/lib/storage";
-import { SQUADS } from "@/app/data/worldcup";
-import { FANTASY_POINTS } from "@/app/data/types";
+import { SQUADS, TEAM_FLAGS } from "@/app/data/worldcup";
+import { AvatarDisplay } from "./AvatarPicker";
 
 interface Props {
   players: Player[];
@@ -11,7 +11,18 @@ interface Props {
   currentPlayerId: string;
 }
 
-const flag = (country: string) => SQUADS[country]?.flag || "";
+function FlagImg({ country, size = 16 }: { country: string; size?: number }) {
+  const code = TEAM_FLAGS[country];
+  if (!code) return null;
+  return <img src={`https://flagcdn.com/w20/${code}.png`} alt={country} width={size} height={Math.round(size * 0.67)} style={{ borderRadius: 2, objectFit: "cover", flexShrink: 0, display: "inline-block", verticalAlign: "middle" }} />;
+}
+
+function PlayerFlagByName({ name }: { name: string }) {
+  const entry = Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === name));
+  if (!entry) return null;
+  return <FlagImg country={entry[0]} size={14} />;
+}
+
 const POSITION_COLORS: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#10b981", FWD: "#ef4444" };
 const medals = ["🥇", "🥈", "🥉"];
 const podiumColors = ["#f59e0b", "#94a3b8", "#c97c47"];
@@ -71,9 +82,7 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                     {isTop3 ? <span style={{ fontSize: "22px" }}>{medals[idx]}</span> : <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-3)" }}>#{idx + 1}</span>}
                   </div>
                   {/* Avatar */}
-                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: isTop3 ? podiumColors[idx] : "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 700, color: isTop3 ? "white" : "var(--text-2)", flexShrink: 0, border: `2px solid ${isTop3 ? podiumColors[idx] : "var(--border)"}` }}>
-                    {player.name.charAt(0).toUpperCase()}
-                  </div>
+                  <AvatarDisplay url={player.avatarUrl} name={player.name} size={52} />
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -84,8 +93,8 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                     {squad && (
                       <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
                         {squad.squad.map(p => (
-                          <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[p.position] + "15", color: POSITION_COLORS[p.position], border: `1px solid ${POSITION_COLORS[p.position]}33`, borderRadius: "4px", padding: "1px 5px" }}>
-                            {flag(p.country)} {p.name}
+                          <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[p.position] + "15", color: POSITION_COLORS[p.position], border: `1px solid ${POSITION_COLORS[p.position]}33`, borderRadius: "4px", padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <FlagImg country={p.country} size={12} /> {p.name}
                           </span>
                         ))}
                       </div>
@@ -120,7 +129,7 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                   {sorted.map((s, i) => (
                     <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                       <span style={{ fontSize: "12px", color: "var(--text-3)", width: "16px" }}>#{i + 1}</span>
-                      <span style={{ fontSize: "13px" }}>{flag(s.country)}</span>
+                      <span style={{ fontSize: "13px" }}><FlagImg country={s.country} size={14} /></span>
                       <span style={{ fontSize: "13px", flex: 1 }}>{s.playerName}</span>
                       <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--green)" }}>{s[key] as number}</span>
                     </div>

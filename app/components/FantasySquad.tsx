@@ -8,9 +8,9 @@ interface Props { player: Player; }
 
 const POSITIONS: FantasyPlayer["position"][] = ["GK", "DEF", "MID", "FWD"];
 const POSITION_LIMITS = { GK: 1, DEF: 4, MID: 3, FWD: 3 };
-const POSITION_COLORS: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#10b981", FWD: "#ef4444" };
+const POSITION_COLORS: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#22c55e", FWD: "#ef4444" };
+const POSITION_BG: Record<string, string> = { GK: "#fef3c7", DEF: "#dbeafe", MID: "#dcfce7", FWD: "#fee2e2" };
 
-// Build flat list from SQUADS with correct positions
 const ALL_PLAYERS: FantasyPlayer[] = Object.entries(SQUADS).flatMap(([country, { players }]) =>
   players.map(p => ({ name: p.name, country, position: p.position }))
 );
@@ -18,9 +18,128 @@ const ALL_PLAYERS: FantasyPlayer[] = Object.entries(SQUADS).flatMap(([country, {
 function FlagImg({ country, size = 18 }: { country: string; size?: number }) {
   const code = TEAM_FLAGS[country];
   if (!code) return null;
-  return <img src={`https://flagcdn.com/w40/${code}.png`} alt={country} width={size} height={Math.round(size * 0.67)} style={{ borderRadius: 2, objectFit: "cover", flexShrink: 0 }} />;
+  return <img src={`https://flagcdn.com/w40/${code}.png`} alt={country} width={size} height={Math.round(size * 0.67)} style={{ borderRadius: 2, objectFit: "cover", flexShrink: 0, display: "inline-block" }} />;
 }
 
+// ── Pitch View ────────────────────────────────────────────
+function PlayerCard({ fp, onRemove, small = false }: { fp: FantasyPlayer; onRemove?: () => void; small?: boolean }) {
+  const code = TEAM_FLAGS[fp.country];
+  const shirtColor = POSITION_COLORS[fp.position];
+  const shortName = fp.name.split(" ").pop() || fp.name;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: onRemove ? "pointer" : "default" }} onClick={onRemove}>
+      {/* Shirt */}
+      <div style={{ position: "relative", width: small ? 44 : 52, height: small ? 44 : 52 }}>
+        <svg viewBox="0 0 52 52" width={small ? 44 : 52} height={small ? 44 : 52}>
+          {/* Shirt body */}
+          <path d="M13,8 L5,18 L13,21 L13,44 L39,44 L39,21 L47,18 L39,8 L32,12 C30,14 22,14 20,12 Z" fill={shirtColor} stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+          {/* Collar */}
+          <path d="M20,12 C22,16 30,16 32,12" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" />
+          {/* Sleeves */}
+          <path d="M13,8 L5,18 L13,21" fill={shirtColor} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
+          <path d="M39,8 L47,18 L39,21" fill={shirtColor} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
+          {/* Chest stripe */}
+          <rect x="21" y="16" width="10" height="16" rx="1" fill="rgba(255,255,255,0.15)" />
+        </svg>
+        {/* Country flag badge */}
+        {code && (
+          <img src={`https://flagcdn.com/w20/${code}.png`} alt={fp.country}
+            style={{ position: "absolute", bottom: 0, right: 0, width: 16, height: 11, borderRadius: 2, border: "1.5px solid white", objectFit: "cover" }} />
+        )}
+      </div>
+      {/* Name plate */}
+      <div style={{
+        background: "rgba(0,0,0,0.75)", color: "white", borderRadius: "3px",
+        padding: "2px 5px", fontSize: small ? 9 : 10, fontWeight: 700,
+        maxWidth: small ? 56 : 66, textAlign: "center", lineHeight: 1.2,
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        letterSpacing: "0.02em",
+      }}>
+        {shortName}
+      </div>
+      {/* Position badge */}
+      <div style={{ fontSize: 8, fontWeight: 800, color: shirtColor, background: "rgba(255,255,255,0.9)", padding: "1px 4px", borderRadius: 2 }}>
+        {fp.position}
+      </div>
+      {onRemove && (
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>tap to remove</div>
+      )}
+    </div>
+  );
+}
+
+function EmptySlot({ position }: { position: FantasyPlayer["position"] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+      <div style={{ width: 48, height: 48, borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 20, opacity: 0.4 }}>+</span>
+      </div>
+      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>{position}</div>
+    </div>
+  );
+}
+
+function PitchView({ squad, onRemove }: { squad: FantasyPlayer[]; onRemove: (name: string) => void }) {
+  const byPos: Record<string, FantasyPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+  squad.forEach(p => byPos[p.position].push(p));
+
+  const rowStyle = (count: number): React.CSSProperties => ({
+    display: "flex",
+    justifyContent: "space-around",
+    alignItems: "center",
+    padding: "8px 4px",
+  });
+
+  return (
+    <div style={{
+      background: "linear-gradient(180deg, #2d8a4e 0%, #1f6b3a 25%, #2d8a4e 50%, #1f6b3a 75%, #2d8a4e 100%)",
+      borderRadius: "8px",
+      padding: "12px 8px",
+      position: "relative",
+      border: "2px solid rgba(255,255,255,0.2)",
+      overflow: "hidden",
+    }}>
+      {/* Pitch lines */}
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
+        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <rect x="20" y="0" width="60" height="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <rect x="20" y="86" width="60" height="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <rect x="35" y="0" width="30" height="6" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <rect x="35" y="94" width="30" height="6" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+      </svg>
+
+      {/* FWD row */}
+      <div style={rowStyle(byPos.FWD.length)}>
+        {byPos.FWD.length > 0
+          ? byPos.FWD.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+          : Array.from({ length: POSITION_LIMITS.FWD }).map((_, i) => <EmptySlot key={i} position="FWD" />)}
+      </div>
+      {/* MID row */}
+      <div style={rowStyle(byPos.MID.length)}>
+        {byPos.MID.length > 0
+          ? byPos.MID.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+          : Array.from({ length: POSITION_LIMITS.MID }).map((_, i) => <EmptySlot key={i} position="MID" />)}
+      </div>
+      {/* DEF row */}
+      <div style={rowStyle(byPos.DEF.length)}>
+        {byPos.DEF.length > 0
+          ? byPos.DEF.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+          : Array.from({ length: POSITION_LIMITS.DEF }).map((_, i) => <EmptySlot key={i} position="DEF" />)}
+      </div>
+      {/* GK row */}
+      <div style={{ ...rowStyle(1), marginTop: "4px" }}>
+        {byPos.GK.length > 0
+          ? byPos.GK.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+          : <EmptySlot position="GK" />}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────
 export default function FantasySquadPicker({ player }: Props) {
   const [squad, setSquad] = useState<FantasyPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,15 +197,13 @@ export default function FantasySquadPicker({ player }: Props) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <div>
-          <h2 style={{ fontSize: "17px", fontWeight: 700 }}>Fantasy Squad</h2>
-          <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
-            Pick 1 GK · 4 DEF · 3 MID · 3 FWD
-          </p>
+          <h2 style={{ fontSize: "17px", fontWeight: 700 }}>My Fantasy Squad</h2>
+          <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>1 GK · 4 DEF · 3 MID · 3 FWD</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {saving && <span style={{ fontSize: "12px", color: "var(--text-3)" }}>Saving...</span>}
-          {saved && <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 600 }}>✓ Saved</span>}
-          <span style={{ fontWeight: 800, fontSize: "16px", color: squad.length === 11 ? "var(--green)" : "var(--amber)" }}>
+          {saved && <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 700 }}>✓ Saved</span>}
+          <span style={{ fontWeight: 800, fontSize: "16px", color: squad.length === 11 ? "var(--green)" : "#f59e0b" }}>
             {squad.length}/11
           </span>
         </div>
@@ -94,52 +211,46 @@ export default function FantasySquadPicker({ player }: Props) {
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "16px" }}>
-        <button className={`tab ${activeTab === "squad" ? "active" : ""}`} onClick={() => setActiveTab("squad")}>My Squad ({squad.length}/11)</button>
-        <button className={`tab ${activeTab === "pick" ? "active" : ""}`} onClick={() => setActiveTab("pick")}>Pick Players</button>
+        <button className={`tab ${activeTab === "squad" ? "active" : ""}`} onClick={() => setActiveTab("squad")}>⚽ My Squad</button>
+        <button className={`tab ${activeTab === "pick" ? "active" : ""}`} onClick={() => setActiveTab("pick")}>+ Pick Players</button>
       </div>
 
-      {/* MY SQUAD */}
+      {/* SQUAD PITCH VIEW */}
       {activeTab === "squad" && (
-        squad.length === 0 ? (
-          <div className="card" style={{ padding: "48px", textAlign: "center" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>👕</div>
-            <p style={{ fontWeight: 600, marginBottom: "12px" }}>No players picked yet</p>
-            <button className="btn-primary" onClick={() => setActiveTab("pick")}>Pick Players →</button>
-          </div>
-        ) : (
-          <div className="card" style={{ padding: "16px", background: "#f0fdf4", borderColor: "#bbf7d0" }}>
-            {POSITIONS.map(pos => {
-              const posPlayers = squad.filter(p => p.position === pos);
-              const needed = POSITION_LIMITS[pos];
-              return (
-                <div key={pos} style={{ marginBottom: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: POSITION_COLORS[pos], textTransform: "uppercase", letterSpacing: "0.05em" }}>{pos}</span>
-                    <span style={{ fontSize: "10px", color: posPlayers.length === needed ? "var(--green)" : "var(--red)" }}>{posPlayers.length}/{needed}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    {posPlayers.map(p => (
-                      <div key={p.name} style={{ display: "flex", alignItems: "center", gap: "5px", background: "white", border: `1.5px solid ${POSITION_COLORS[pos]}44`, borderRadius: "6px", padding: "5px 10px" }}>
-                        <FlagImg country={p.country} size={16} />
-                        <span style={{ fontSize: "12px", fontWeight: 600 }}>{p.name}</span>
-                        <span style={{ fontSize: "9px", color: POSITION_COLORS[pos], fontWeight: 700 }}>{p.position}</span>
-                        <button onClick={() => removePlayer(p.name)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: "14px", padding: "0 0 0 2px", lineHeight: 1 }}>×</button>
-                      </div>
-                    ))}
-                    {Array.from({ length: needed - posPlayers.length }).map((_, i) => (
-                      <div key={i} style={{ border: "1.5px dashed var(--border)", borderRadius: "6px", padding: "5px 14px", fontSize: "11px", color: "var(--text-3)" }}>Empty</div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            {squad.length < 11 && (
-              <div style={{ marginTop: "8px", textAlign: "center" }}>
-                <button className="btn-primary" onClick={() => setActiveTab("pick")} style={{ fontSize: "13px" }}>+ Add more players</button>
+        <div>
+          <PitchView squad={squad} onRemove={removePlayer} />
+          
+          {squad.length === 0 && (
+            <div style={{ textAlign: "center", marginTop: "16px" }}>
+              <button className="btn-primary" onClick={() => setActiveTab("pick")}>Pick your squad →</button>
+            </div>
+          )}
+
+          {squad.length > 0 && squad.length < 11 && (
+            <div style={{ marginTop: "12px" }}>
+              {/* Missing positions */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+                {POSITIONS.map(pos => {
+                  const have = counts[pos];
+                  const need = POSITION_LIMITS[pos];
+                  const ok = have === need;
+                  return (
+                    <span key={pos} style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "12px", fontWeight: 700, background: ok ? POSITION_BG[pos] : "#fee2e2", color: ok ? POSITION_COLORS[pos] : "var(--red)", border: `1px solid ${ok ? POSITION_COLORS[pos] + "44" : "#fca5a5"}` }}>
+                      {pos}: {have}/{need} {!ok && "⚠️"}
+                    </span>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )
+              <button className="btn-secondary" onClick={() => setActiveTab("pick")} style={{ fontSize: "13px" }}>+ Add more players</button>
+            </div>
+          )}
+
+          {squad.length === 11 && (
+            <p style={{ textAlign: "center", marginTop: "10px", fontSize: "12px", color: "var(--green)", fontWeight: 600 }}>
+              ✓ Squad complete! Tap any player on the pitch to remove them.
+            </p>
+          )}
+        </div>
       )}
 
       {/* PICK PLAYERS */}
@@ -148,7 +259,7 @@ export default function FantasySquadPicker({ player }: Props) {
           {/* Position slots */}
           <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap" }}>
             {POSITIONS.map(pos => (
-              <div key={pos} style={{ padding: "4px 10px", borderRadius: "99px", background: POSITION_COLORS[pos] + "18", color: POSITION_COLORS[pos], border: `1px solid ${POSITION_COLORS[pos]}44`, fontSize: "12px", fontWeight: 700 }}>
+              <div key={pos} style={{ padding: "4px 10px", borderRadius: "99px", background: POSITION_BG[pos], color: POSITION_COLORS[pos], border: `1px solid ${POSITION_COLORS[pos]}44`, fontSize: "12px", fontWeight: 700 }}>
                 {pos}: {counts[pos]}/{POSITION_LIMITS[pos]}
               </div>
             ))}
@@ -176,13 +287,13 @@ export default function FantasySquadPicker({ player }: Props) {
               const disabled = !inSquad && (posFull || squadFull);
 
               return (
-                <div key={`${fp.country}-${fp.name}`} className="card" style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: "10px", opacity: disabled ? 0.45 : 1 }}>
+                <div key={`${fp.country}-${fp.name}`} className="card" style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: "10px", opacity: disabled ? 0.4 : 1 }}>
                   <FlagImg country={fp.country} size={20} />
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: "13px", fontWeight: 600 }}>{fp.name}</span>
                     <span style={{ fontSize: "11px", color: "var(--text-3)", marginLeft: "6px" }}>{fp.country}</span>
                   </div>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: POSITION_COLORS[fp.position], background: POSITION_COLORS[fp.position] + "18", padding: "2px 6px", borderRadius: "99px" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: POSITION_COLORS[fp.position], background: POSITION_BG[fp.position], padding: "2px 7px", borderRadius: "99px", border: `1px solid ${POSITION_COLORS[fp.position]}33` }}>
                     {fp.position}
                   </span>
                   {inSquad ? (
