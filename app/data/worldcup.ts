@@ -282,10 +282,10 @@ export interface SquadPlayer { name: string; position: PlayerPosition; }
 
 export const SQUADS: Record<string, { flag: string; players: SquadPlayer[] }> = {
   "England": { flag: "gb-eng", players: [
-    { name: "Jordan Pickford", position: "GK" },
-    { name: "Kyle Walker", position: "DEF" }, { name: "John Stones", position: "DEF" }, { name: "Trent Alexander-Arnold", position: "DEF" }, { name: "Luke Shaw", position: "DEF" },
-    { name: "Declan Rice", position: "MID" }, { name: "Jude Bellingham", position: "MID" }, { name: "Conor Gallagher", position: "MID" }, { name: "Phil Foden", position: "MID" }, { name: "Cole Palmer", position: "MID" },
-    { name: "Harry Kane", position: "FWD" }, { name: "Bukayo Saka", position: "FWD" }, { name: "Marcus Rashford", position: "FWD" }, { name: "Jack Grealish", position: "FWD" }, { name: "Ollie Watkins", position: "FWD" }, { name: "Anthony Gordon", position: "FWD" },
+    { name: "Jordan Pickford", position: "GK" }, { name: "Aaron Ramsdale", position: "GK" },
+    { name: "John Stones", position: "DEF" }, { name: "Marc Guéhi", position: "DEF" }, { name: "Ezri Konsa", position: "DEF" }, { name: "Luke Shaw", position: "DEF" }, { name: "Kieran Trippier", position: "DEF" },
+    { name: "Declan Rice", position: "MID" }, { name: "Jude Bellingham", position: "MID" }, { name: "Conor Gallagher", position: "MID" }, { name: "Phil Foden", position: "MID" }, { name: "Cole Palmer", position: "MID" }, { name: "Adam Wharton", position: "MID" },
+    { name: "Harry Kane", position: "FWD" }, { name: "Bukayo Saka", position: "FWD" }, { name: "Marcus Rashford", position: "FWD" }, { name: "Jack Grealish", position: "FWD" }, { name: "Ollie Watkins", position: "FWD" }, { name: "Anthony Gordon", position: "FWD" }, { name: "Jarrod Bowen", position: "FWD" },
   ]},
   "France": { flag: "fr", players: [
     { name: "Mike Maignan", position: "GK" },

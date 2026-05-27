@@ -95,7 +95,8 @@ export function isPredictionLocked(adminState: AdminState): boolean {
 
 // ── Fantasy ───────────────────────────────────────────────
 export async function getFantasySquad(playerId: string): Promise<FantasySquad | null> {
-  const { data } = await supabase.from("fantasy_squads").select("*").eq("player_id", playerId).single();
+  const { data, error } = await supabase.from("fantasy_squads").select("*").eq("player_id", playerId).maybeSingle();
+  if (error) { console.error("getFantasySquad error:", error.message); return null; }
   if (!data) return null;
   return { id: data.id, playerId: data.player_id, squad: data.squad || [], round: data.round, updatedAt: data.updated_at };
 }
@@ -104,7 +105,8 @@ export async function getAllFantasySquads(): Promise<FantasySquad[]> {
   return (data || []).map(d => ({ id: d.id, playerId: d.player_id, squad: d.squad || [], round: d.round, updatedAt: d.updated_at }));
 }
 export async function saveFantasySquad(squad: FantasySquad): Promise<void> {
-  await supabase.from("fantasy_squads").upsert({ id: squad.playerId, player_id: squad.playerId, squad: squad.squad, round: squad.round, updated_at: new Date().toISOString() });
+  const { error } = await supabase.from("fantasy_squads").upsert({ id: squad.playerId, player_id: squad.playerId, squad: squad.squad, round: squad.round, updated_at: new Date().toISOString() });
+  if (error) console.error("saveFantasySquad error:", error.message);
 }
 
 // ── Player Stats ──────────────────────────────────────────
