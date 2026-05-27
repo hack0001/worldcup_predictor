@@ -440,7 +440,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   <label className="label">Player</label>
                   <select value={newStat.playerName} onChange={e => setNewStat({ ...newStat, playerName: e.target.value })} disabled={!newStat.country}>
                     <option value="">Select player...</option>
-                    {(newStat.country ? SQUADS[newStat.country].players.sort() : []).map(p => <option key={p} value={p}>{p}</option>)}
+                    {(newStat.country ? [...SQUADS[newStat.country].players].sort((a,b) => a.name.localeCompare(b.name)) : []).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                   </select>
                 </div>
               </div>

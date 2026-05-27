@@ -15,7 +15,7 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
 
   // Find which country the current player belongs to
   const currentCountry = value
-    ? Object.entries(SQUADS).find(([, s]) => s.players.includes(value))?.[0] || ""
+    ? Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === value))?.[0] || ""
     : "";
 
   const flagUrl = (country: string) => {
@@ -25,7 +25,7 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
 
   // Flat list of all players with country info, filtered by search
   const allPlayers = Object.entries(SQUADS).flatMap(([country, { players }]) =>
-    players.map(name => ({ name, country }))
+    players.map(p => ({ name: p.name, country }))
   ).sort((a, b) => a.name.localeCompare(b.name));
 
   const filtered = search.trim()

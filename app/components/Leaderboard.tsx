@@ -12,7 +12,7 @@ interface Props {
 }
 
 function PlayerFlag({ name }: { name: string }) {
-  const entry = Object.entries(SQUADS).find(([, s]) => s.players.includes(name));
+  const entry = Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === name));
   if (!entry) return null;
   const code = TEAM_FLAGS[entry[0]];
   if (!code) return null;
