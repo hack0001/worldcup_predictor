@@ -22,60 +22,55 @@ function FlagImg({ country, size = 18 }: { country: string; size?: number }) {
 }
 
 // ── Pitch View ────────────────────────────────────────────
-function PlayerCard({ fp, onRemove, small = false }: { fp: FantasyPlayer; onRemove?: () => void; small?: boolean }) {
+function PlayerCard({ fp, onRemove }: { fp: FantasyPlayer; onRemove?: () => void }) {
   const code = TEAM_FLAGS[fp.country];
   const shirtColor = POSITION_COLORS[fp.position];
   const shortName = fp.name.split(" ").pop() || fp.name;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: onRemove ? "pointer" : "default" }} onClick={onRemove}>
-      {/* Shirt */}
-      <div style={{ position: "relative", width: small ? 44 : 52, height: small ? 44 : 52 }}>
-        <svg viewBox="0 0 52 52" width={small ? 44 : 52} height={small ? 44 : 52}>
-          {/* Shirt body */}
-          <path d="M13,8 L5,18 L13,21 L13,44 L39,44 L39,21 L47,18 L39,8 L32,12 C30,14 22,14 20,12 Z" fill={shirtColor} stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
-          {/* Collar */}
-          <path d="M20,12 C22,16 30,16 32,12" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" />
-          {/* Sleeves */}
-          <path d="M13,8 L5,18 L13,21" fill={shirtColor} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-          <path d="M39,8 L47,18 L39,21" fill={shirtColor} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-          {/* Chest stripe */}
-          <rect x="21" y="16" width="10" height="16" rx="1" fill="rgba(255,255,255,0.15)" />
+    <div
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: onRemove ? "pointer" : "default", minWidth: 80 }}
+      onClick={onRemove}
+      title={onRemove ? `Remove ${fp.name}` : fp.name}
+    >
+      {/* Country flag on top */}
+      <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {code
+          ? <img src={`https://flagcdn.com/w40/${code}.png`} alt={fp.country} width={28} height={19} style={{ borderRadius: 3, objectFit: "cover", border: "1.5px solid rgba(255,255,255,0.8)", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }} />
+          : <div style={{ width: 28, height: 19, borderRadius: 3, background: "rgba(255,255,255,0.2)" }} />
+        }
+      </div>
+      {/* Shirt — big */}
+      <div style={{ position: "relative", width: 90, height: 90 }}>
+        <svg viewBox="0 0 52 52" width={90} height={90}>
+          <path d="M13,8 L5,18 L13,21 L13,44 L39,44 L39,21 L47,18 L39,8 L32,12 C30,15 22,15 20,12 Z" fill={shirtColor} />
+          <path d="M20,12 C22,16 30,16 32,12" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" />
+          <path d="M13,8 L5,18 L13,21" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+          <path d="M39,8 L47,18 L39,21" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+          <rect x="22" y="15" width="8" height="18" rx="1" fill="rgba(255,255,255,0.18)" />
+          <path d="M13,8 L5,18 L13,21 L13,44 L39,44 L39,21 L47,18 L39,8 L32,12 C30,15 22,15 20,12 Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="0.8" />
         </svg>
-        {/* Country flag badge */}
-        {code && (
-          <img src={`https://flagcdn.com/w20/${code}.png`} alt={fp.country}
-            style={{ position: "absolute", bottom: 0, right: 0, width: 16, height: 11, borderRadius: 2, border: "1.5px solid white", objectFit: "cover" }} />
-        )}
       </div>
       {/* Name plate */}
-      <div style={{
-        background: "rgba(0,0,0,0.75)", color: "white", borderRadius: "3px",
-        padding: "2px 5px", fontSize: small ? 9 : 10, fontWeight: 700,
-        maxWidth: small ? 56 : 66, textAlign: "center", lineHeight: 1.2,
-        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        letterSpacing: "0.02em",
-      }}>
+      <div style={{ background: "rgba(0,0,0,0.82)", color: "white", borderRadius: "4px", padding: "3px 7px", fontSize: 11, fontWeight: 800, maxWidth: 84, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.03em" }}>
         {shortName}
       </div>
       {/* Position badge */}
-      <div style={{ fontSize: 8, fontWeight: 800, color: shirtColor, background: "rgba(255,255,255,0.9)", padding: "1px 4px", borderRadius: 2 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: "white", background: shirtColor, padding: "1px 5px", borderRadius: 3 }}>
         {fp.position}
       </div>
-      {onRemove && (
-        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>tap to remove</div>
-      )}
     </div>
   );
 }
 
 function EmptySlot({ position }: { position: FantasyPlayer["position"] }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-      <div style={{ width: 48, height: 48, borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontSize: 20, opacity: 0.4 }}>+</span>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", minWidth: 80, opacity: 0.45 }}>
+      <div style={{ width: 28, height: 20 }} />
+      <div style={{ width: 90, height: 90, borderRadius: "8px", border: "2.5px dashed rgba(255,255,255,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 30, color: "rgba(255,255,255,0.4)", lineHeight: 1 }}>+</span>
       </div>
-      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>{position}</div>
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>{position}</div>
     </div>
   );
 }
@@ -84,57 +79,35 @@ function PitchView({ squad, onRemove }: { squad: FantasyPlayer[]; onRemove: (nam
   const byPos: Record<string, FantasyPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
 
-  const rowStyle = (count: number): React.CSSProperties => ({
-    display: "flex",
-    justifyContent: "space-around",
-    alignItems: "center",
-    padding: "8px 4px",
-  });
+  const Row = ({ pos }: { pos: FantasyPlayer["position"] }) => (
+    <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-start", padding: "10px 4px" }}>
+      {byPos[pos].length > 0
+        ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+        : Array.from({ length: POSITION_LIMITS[pos] }).map((_, i) => <EmptySlot key={i} position={pos} />)
+      }
+    </div>
+  );
 
   return (
-    <div style={{
-      background: "linear-gradient(180deg, #2d8a4e 0%, #1f6b3a 25%, #2d8a4e 50%, #1f6b3a 75%, #2d8a4e 100%)",
-      borderRadius: "8px",
-      padding: "12px 8px",
-      position: "relative",
-      border: "2px solid rgba(255,255,255,0.2)",
-      overflow: "hidden",
-    }}>
-      {/* Pitch lines */}
+    <div style={{ background: "#2d8a4e", borderRadius: "10px", padding: "8px", position: "relative", border: "3px solid rgba(255,255,255,0.2)", overflow: "hidden" }}>
+      {/* Clear pitch lines */}
       <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} viewBox="0 0 100 100" preserveAspectRatio="none">
-        <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
-        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-        <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-        <rect x="20" y="0" width="60" height="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-        <rect x="20" y="86" width="60" height="14" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-        <rect x="35" y="0" width="30" height="6" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-        <rect x="35" y="94" width="30" height="6" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        <rect x="1" y="1" width="98" height="98" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.8" />
+        <line x1="1" y1="50" x2="99" y2="50" stroke="rgba(255,255,255,0.55)" strokeWidth="0.8" />
+        <circle cx="50" cy="50" r="12" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.8" />
+        <circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.6)" />
+        <rect x="22" y="1" width="56" height="16" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.7" />
+        <rect x="36" y="1" width="28" height="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.6" />
+        <rect x="22" y="83" width="56" height="16" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.7" />
+        <rect x="36" y="93" width="28" height="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.6" />
+        <path d="M 36,17 A 10,10 0 0,0 64,17" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.6" />
+        <path d="M 36,83 A 10,10 0 0,1 64,83" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.6" />
       </svg>
-
-      {/* FWD row */}
-      <div style={rowStyle(byPos.FWD.length)}>
-        {byPos.FWD.length > 0
-          ? byPos.FWD.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
-          : Array.from({ length: POSITION_LIMITS.FWD }).map((_, i) => <EmptySlot key={i} position="FWD" />)}
-      </div>
-      {/* MID row */}
-      <div style={rowStyle(byPos.MID.length)}>
-        {byPos.MID.length > 0
-          ? byPos.MID.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
-          : Array.from({ length: POSITION_LIMITS.MID }).map((_, i) => <EmptySlot key={i} position="MID" />)}
-      </div>
-      {/* DEF row */}
-      <div style={rowStyle(byPos.DEF.length)}>
-        {byPos.DEF.length > 0
-          ? byPos.DEF.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
-          : Array.from({ length: POSITION_LIMITS.DEF }).map((_, i) => <EmptySlot key={i} position="DEF" />)}
-      </div>
-      {/* GK row */}
-      <div style={{ ...rowStyle(1), marginTop: "4px" }}>
-        {byPos.GK.length > 0
-          ? byPos.GK.map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
-          : <EmptySlot position="GK" />}
-      </div>
+      {/* GK at top, FWD at bottom */}
+      <Row pos="GK" />
+      <Row pos="DEF" />
+      <Row pos="MID" />
+      <Row pos="FWD" />
     </div>
   );
 }
