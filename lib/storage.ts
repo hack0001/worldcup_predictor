@@ -363,3 +363,39 @@ export function subscribeToMessages(callback: (msg: Message) => void) {
 
 // ── GIF message type ──────────────────────────────────────
 // Messages with gifUrl are GIF messages, content stores the search term
+
+// ── Message Reactions ─────────────────────────────────────
+export interface Reaction {
+  messageId: string;
+  playerId: string;
+  emoji: string;
+}
+
+export async function getReactions(messageIds: string[]): Promise<Reaction[]> {
+  if (!messageIds.length) return [];
+  const { data } = await supabase.from("message_reactions").select("*").in("message_id", messageIds);
+  return (data || []).map(d => ({ messageId: d.message_id, playerId: d.player_id, emoji: d.emoji }));
+}
+
+export async function toggleReaction(messageId: string, playerId: string, emoji: string): Promise<void> {
+  const { data } = await supabase.from("message_reactions").select("id")
+    .eq("message_id", messageId).eq("player_id", playerId).eq("emoji", emoji).maybeSingle();
+  if (data) {
+    await supabase.from("message_reactions").delete().eq("id", data.id);
+  } else {
+    await supabase.from("message_reactions").insert({ message_id: messageId, player_id: playerId, emoji });
+  }
+}
+
+export function subscribeToReactions(callback: (r: Reaction, deleted: boolean) => void) {
+  return supabase.channel("reactions")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "message_reactions" }, p => {
+      const d = p.new as Record<string, unknown>;
+      callback({ messageId: d.message_id as string, playerId: d.player_id as string, emoji: d.emoji as string }, false);
+    })
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "message_reactions" }, p => {
+      const d = p.old as Record<string, unknown>;
+      callback({ messageId: d.message_id as string, playerId: d.player_id as string, emoji: d.emoji as string }, true);
+    })
+    .subscribe();
+}

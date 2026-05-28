@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
-import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages } from "@/lib/storage";
+import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { AvatarDisplay } from "./AvatarPicker";
 import GifPicker from "./GifPicker";
+import EmojiPicker from "./EmojiPicker";
 import { PollCard, CreatePoll } from "./Poll";
 
 interface Props {
@@ -37,6 +38,8 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   const [polls, setPolls] = useState<Record<string, Poll>>({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [showEmojiFor, setShowEmojiFor] = useState<string | null>(null); // messageId
   const [sending, setSending] = useState(false);
   const [showGif, setShowGif] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
@@ -50,6 +53,9 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     getMessages(100).then(async msgs => {
       setMessages(msgs);
       setLoading(false);
+      // Load reactions for all messages
+      const ids = msgs.map(m => m.id);
+      getReactions(ids).then(setReactions);
       // Load polls referenced in messages
       const pollIds = [...new Set(msgs.map(m => m.pollId).filter(Boolean))];
       if (pollIds.length > 0) {
@@ -65,11 +71,21 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   useEffect(() => {
     const channel = subscribeToMessages(async msg => {
       setMessages(prev => [...prev, msg]);
-      // If message has a poll, fetch it
       if (msg.pollId) {
         const { data } = await supabase.from("polls").select("*").eq("id", msg.pollId).single();
         if (data) setPolls(prev => ({ ...prev, [data.id]: { id: data.id, playerId: data.player_id, question: data.question, options: data.options, createdAt: data.created_at } }));
       }
+    });
+    return () => { channel.unsubscribe(); };
+  }, []);
+
+  // Subscribe to reactions
+  useEffect(() => {
+    const channel = subscribeToReactions((r, deleted) => {
+      setReactions(prev => deleted
+        ? prev.filter(x => !(x.messageId === r.messageId && x.playerId === r.playerId && x.emoji === r.emoji))
+        : [...prev.filter(x => !(x.messageId === r.messageId && x.playerId === r.playerId && x.emoji === r.emoji)), r]
+      );
     });
     return () => { channel.unsubscribe(); };
   }, []);
@@ -88,6 +104,11 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     await sendMessage(currentPlayer.id, trimmed || (gifUrl ? "GIF" : "📊 Poll"), gifUrl, pollId);
     setSending(false);
     inputRef.current?.focus();
+  };
+
+  const handleReaction = async (messageId: string, emoji: string) => {
+    setShowEmojiFor(null);
+    await toggleReaction(messageId, currentPlayer.id, emoji);
   };
 
   const handlePollCreated = (poll: Poll) => {
@@ -201,8 +222,60 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
                     {canDelete && (
                       <button onClick={() => handleDelete(msg.id)} style={{ fontSize: "10px", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>delete</button>
                     )}
+                    <button
+                      onClick={() => setShowEmojiFor(showEmojiFor === msg.id ? null : msg.id)}
+                      style={{ fontSize: "12px", background: "none", border: "1px solid var(--border)", borderRadius: "99px", cursor: "pointer", padding: "1px 6px", color: "var(--text-3)", lineHeight: 1.4 }}
+                      title="React"
+                    >
+                      😊 +
+                    </button>
                   </div>
                 )}
+
+                {/* Emoji picker for this message */}
+                {showEmojiFor === msg.id && (
+                  <div style={{ position: "relative", zIndex: 100, marginTop: "4px" }}>
+                    <EmojiPicker onSelect={emoji => handleReaction(msg.id, emoji)} onClose={() => setShowEmojiFor(null)} />
+                  </div>
+                )}
+
+                {/* Reaction pills */}
+                {(() => {
+                  const msgReactions = reactions.filter(r => r.messageId === msg.id);
+                  if (!msgReactions.length) return null;
+                  // Group by emoji
+                  const grouped: Record<string, { count: number; mine: boolean; players: string[] }> = {};
+                  msgReactions.forEach(r => {
+                    if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, mine: false, players: [] };
+                    grouped[r.emoji].count++;
+                    grouped[r.emoji].players.push(r.playerId);
+                    if (r.playerId === currentPlayer.id) grouped[r.emoji].mine = true;
+                  });
+                  return (
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px", padding: "0 4px" }}>
+                      {Object.entries(grouped).map(([emoji, { count, mine, players }]) => {
+                        const names = players.map(id => playerMap[id]?.name || "Someone").join(", ");
+                        return (
+                          <button
+                            key={emoji}
+                            onClick={() => handleReaction(msg.id, emoji)}
+                            title={names}
+                            style={{
+                              fontSize: "12px", padding: "2px 7px", borderRadius: "99px",
+                              border: `1.5px solid ${mine ? "var(--green)" : "var(--border)"}`,
+                              background: mine ? "var(--green-light)" : "var(--surface)",
+                              cursor: "pointer", display: "flex", alignItems: "center", gap: "3px",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            <span style={{ fontSize: "14px" }}>{emoji}</span>
+                            <span style={{ fontWeight: 700, color: mine ? "var(--green)" : "var(--text-2)", fontSize: "11px" }}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
