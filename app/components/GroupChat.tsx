@@ -103,19 +103,9 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   }, []);
 
   useEffect(() => {
-    if (messages.length === 0) return;
-    if (!initialScrollDone.current) {
-      // Double rAF ensures DOM is fully painted before we measure scrollHeight
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          scrollToBottom(true);
-          initialScrollDone.current = true;
-        });
-      });
-    } else {
-      scrollToBottom(false);
-    }
-  }, [messages]);
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
+  });
 
   const send = async (content: string, gifUrl?: string, pollId?: string) => {
     const trimmed = content.trim();
