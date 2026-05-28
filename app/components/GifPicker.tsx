@@ -8,11 +8,12 @@ const SUGGESTIONS = ["goal", "celebration", "tackle", "offside", "crying", "shoc
 
 interface KlipyGif {
   id: string;
-  title: string;
-  media_formats: {
-    tinygif: { url: string };
-    gif: { url: string };
-  };
+  title?: string;
+  media_formats?: { tinygif?: { url: string }; gif?: { url: string } };
+  // Klipy also returns these directly
+  preview_url?: string;
+  url?: string;
+  media?: Array<{ tinygif?: { url: string }; gif?: { url: string } }>;
 }
 
 interface Props {
@@ -30,19 +31,17 @@ export default function GifPicker({ onSelect, onClose }: Props) {
     if (!API_KEY) return;
     setLoading(true);
     try {
-      const endpoint = q.trim() ? "gifs/search" : "gifs/trending";
-      const params = new URLSearchParams({
-        api_key: API_KEY,
-        limit: "24",
-        contentfilter: "medium",
-        media_filter: "tinygif,gif",
-        ...(q.trim() ? { q } : {}),
-      });
-      const res = await fetch(`https://api.klipy.co/v1/${endpoint}?${params}`);
+      const base = `https://api.klipy.com/api/v1/${API_KEY}/gifs`;
+      const url = q.trim()
+        ? `${base}/search?q=${encodeURIComponent(q)}&limit=24`
+        : `${base}/trending?limit=24`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setGifs(data.results || data.data || []);
+      setGifs(data.data || data.results || []);
     } catch (e) {
       console.error("Klipy error:", e);
+      setGifs([]);
     } finally {
       setLoading(false);
     }
@@ -109,23 +108,36 @@ export default function GifPicker({ onSelect, onClose }: Props) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>No GIFs found</div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px" }}>
-          {gifs.map(gif => (
-            <button
-              key={gif.id}
-              onClick={() => onSelect(gif.media_formats.gif?.url || gif.media_formats.tinygif.url)}
-              style={{ padding: 0, border: "2px solid transparent", borderRadius: "6px", overflow: "hidden", cursor: "pointer", background: "var(--surface2)" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--green)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
-              title={gif.title}
-            >
-              <img
-                src={gif.media_formats.tinygif?.url || gif.media_formats.gif?.url}
-                alt={gif.title}
-                style={{ width: "100%", height: "78px", objectFit: "cover", display: "block" }}
-                loading="lazy"
-              />
-            </button>
-          ))}
+          {gifs.map((gif, idx) => {
+            // Handle various Klipy response structures
+            const previewUrl = gif.media_formats?.tinygif?.url
+              || gif.media?.[0]?.tinygif?.url
+              || gif.preview_url
+              || gif.url
+              || "";
+            const fullUrl = gif.media_formats?.gif?.url
+              || gif.media?.[0]?.gif?.url
+              || gif.url
+              || previewUrl;
+            if (!previewUrl) return null;
+            return (
+              <button
+                key={gif.id || idx}
+                onClick={() => onSelect(fullUrl)}
+                style={{ padding: 0, border: "2px solid transparent", borderRadius: "6px", overflow: "hidden", cursor: "pointer", background: "var(--surface2)" }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--green)")}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
+                title={gif.title || "GIF"}
+              >
+                <img
+                  src={previewUrl}
+                  alt={gif.title || "GIF"}
+                  style={{ width: "100%", height: "78px", objectFit: "cover", display: "block" }}
+                  loading="lazy"
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
