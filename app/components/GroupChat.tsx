@@ -53,6 +53,8 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     getMessages(100).then(async msgs => {
       setMessages(msgs);
       setLoading(false);
+      // Scroll to bottom after load
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 50);
       // Load reactions for all messages
       const ids = msgs.map(m => m.id);
       getReactions(ids).then(setReactions);
