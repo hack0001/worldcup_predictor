@@ -108,7 +108,24 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
 
   const handleReaction = async (messageId: string, emoji: string) => {
     setShowEmojiFor(null);
-    await toggleReaction(messageId, currentPlayer.id, emoji);
+    // Check if user already reacted to this message with any emoji
+    const existing = reactions.find(r => r.messageId === messageId && r.playerId === currentPlayer.id);
+    if (existing) {
+      if (existing.emoji === emoji) {
+        // Same emoji — toggle off
+        await toggleReaction(messageId, currentPlayer.id, emoji);
+      } else {
+        // Different emoji — remove old, add new
+        await supabase.from("message_reactions")
+          .delete()
+          .eq("message_id", messageId)
+          .eq("player_id", currentPlayer.id);
+        await supabase.from("message_reactions")
+          .insert({ message_id: messageId, player_id: currentPlayer.id, emoji });
+      }
+    } else {
+      await toggleReaction(messageId, currentPlayer.id, emoji);
+    }
   };
 
   const handlePollCreated = (poll: Poll) => {
@@ -206,10 +223,13 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
                 )}
 
                 {/* Bubble + hover react button */}
-                <div style={{ position: "relative", display: "inline-block" }}
-                  onMouseEnter={e => { e.currentTarget.querySelector<HTMLElement>(".react-btn")!.style.opacity = "1"; }}
-                  onMouseLeave={e => { const b = e.currentTarget.querySelector<HTMLElement>(".react-btn"); if (b) b.style.opacity = "0"; }}
-                >
+                {(() => {
+                  const alreadyReacted = reactions.some(r => r.messageId === msg.id && r.playerId === currentPlayer.id);
+                  return (
+                    <div style={{ position: "relative", display: "inline-block" }}
+                      onMouseEnter={e => { if (!alreadyReacted) { const b = e.currentTarget.querySelector<HTMLElement>(".react-btn"); if (b) b.style.opacity = "1"; }}}
+                      onMouseLeave={e => { const b = e.currentTarget.querySelector<HTMLElement>(".react-btn"); if (b) b.style.opacity = "0"; }}
+                    >
                   {isGif ? (
                     <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid var(--border)", cursor: "pointer" }}
                       onClick={() => window.open(msg.gifUrl, "_blank")}>
@@ -227,25 +247,30 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
                     </div>
                   )}
 
-                  {/* React button — hidden until hover */}
-                  <button
-                    className="react-btn"
-                    onClick={() => setShowEmojiFor(showEmojiFor === msg.id ? null : msg.id)}
-                    style={{
-                      position: "absolute",
-                      [isMe ? "left" : "right"]: "-28px",
-                      top: "50%", transform: "translateY(-50%)",
-                      fontSize: "14px", background: "var(--surface)", border: "1px solid var(--border)",
-                      borderRadius: "99px", cursor: "pointer", padding: "2px 5px", lineHeight: 1,
-                      opacity: showEmojiFor === msg.id ? 1 : 0,
-                      transition: "opacity 0.15s",
-                      whiteSpace: "nowrap",
-                    }}
-                    title="Add reaction"
-                  >
-                    😊
-                  </button>
+                  {/* React button — hidden until hover, hidden if already reacted */}
+                  {!alreadyReacted && (
+                    <button
+                      className="react-btn"
+                      onClick={() => setShowEmojiFor(showEmojiFor === msg.id ? null : msg.id)}
+                      style={{
+                        position: "absolute",
+                        [isMe ? "left" : "right"]: "-32px",
+                        top: "50%", transform: "translateY(-50%)",
+                        fontSize: "13px", background: "var(--surface)", border: "1px solid var(--border)",
+                        borderRadius: "99px", cursor: "pointer", padding: "2px 6px", lineHeight: 1,
+                        opacity: showEmojiFor === msg.id ? 1 : 0,
+                        transition: "opacity 0.15s",
+                        whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "2px",
+                      }}
+                      title="Add reaction"
+                    >
+                      <span>😊</span>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-3)" }}>+</span>
+                    </button>
+                  )}
                 </div>
+                  );
+                })()}
 
                 {/* Time + delete */}
                 {msg.isLast && (
