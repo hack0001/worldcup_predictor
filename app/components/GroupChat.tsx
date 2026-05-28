@@ -43,9 +43,20 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   const [sending, setSending] = useState(false);
   const [showGif, setShowGif] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialScrollDone = useRef(false);
+
+  const scrollToBottom = (instant = false) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (instant) {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  };
 
   const playerMap = Object.fromEntries(allPlayers.map(p => [p.id, p]));
 
@@ -92,19 +103,17 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   }, []);
 
   useEffect(() => {
-    if (!bottomRef.current) return;
+    if (messages.length === 0) return;
     if (!initialScrollDone.current) {
-      // First load — wait two frames for DOM to fully paint, then jump instantly
-      const raf1 = requestAnimationFrame(() => {
+      // Double rAF ensures DOM is fully painted before we measure scrollHeight
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView({ behavior: "instant" });
+          scrollToBottom(true);
           initialScrollDone.current = true;
         });
       });
-      return () => cancelAnimationFrame(raf1);
     } else {
-      // New message — smooth scroll
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+      scrollToBottom(false);
     }
   }, [messages]);
 
@@ -177,7 +186,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -343,7 +352,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
             </div>
           );
         })}
-        <div ref={bottomRef} />
+        <div ref={messagesEndRef} />
       </div>
 
       {/* GIF Picker */}
