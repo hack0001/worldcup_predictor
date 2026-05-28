@@ -14,8 +14,9 @@ import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import GroupStandings from "@/app/components/GroupStandings";
 import TeamInfo from "@/app/components/TeamInfo";
 import GroupChat from "@/app/components/GroupChat";
+import { PollFeed } from "@/app/components/Poll";
 
-type Tab = "groups" | "knockout" | "predictor-board" | "standings" | "teams" | "chat" | "fantasy" | "fantasy-board" | "profile" | "admin";
+type Tab = "groups" | "knockout" | "predictor-board" | "standings" | "teams" | "chat" | "polls" | "fantasy" | "fantasy-board" | "profile" | "admin";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -72,6 +73,7 @@ export default function Home() {
     { id: "standings", label: "Standings", emoji: "📊", group: "predict" },
     { id: "teams", label: "Teams & Form", emoji: "📋", group: "predict" },
     { id: "chat", label: "Chat", emoji: "💬", group: "predict" },
+    { id: "polls", label: "Polls", emoji: "📊", group: "predict" },
     { id: "predictor-board", label: "Predictor Board", emoji: "🏆", group: "predict" },
     { id: "fantasy", label: "My Squad", emoji: "👕", group: "fantasy" },
     { id: "fantasy-board", label: "Fantasy Board", emoji: "⭐", group: "fantasy" },
@@ -162,11 +164,10 @@ export default function Home() {
       {activeTab === "standings" && <GroupStandings adminState={adminState} />}
       {activeTab === "teams" && <TeamInfo />}
       {activeTab === "chat" && (
-        <GroupChat
-          currentPlayer={currentPlayer}
-          allPlayers={players}
-          isAdmin={showAdmin}
-        />
+        <GroupChat currentPlayer={currentPlayer} allPlayers={players} isAdmin={showAdmin} />
+      )}
+      {activeTab === "polls" && (
+        <PollFeed currentPlayer={currentPlayer} allPlayers={players} />
       )}
       {activeTab === "fantasy" && <FantasySquadPicker player={currentPlayer} />}
       {activeTab === "fantasy-board" && <FantasyLeaderboard players={players} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}

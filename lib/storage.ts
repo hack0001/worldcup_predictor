@@ -326,6 +326,7 @@ export interface Message {
   playerId: string;
   content: string;
   gifUrl?: string;
+  pollId?: string;
   createdAt: string;
 }
 
@@ -337,12 +338,12 @@ export async function getMessages(limit = 100): Promise<Message[]> {
     .limit(limit);
   return (data || []).map(d => ({
     id: d.id, playerId: d.player_id, content: d.content,
-    gifUrl: d.gif_url || "", createdAt: d.created_at,
+    gifUrl: d.gif_url || "", pollId: d.poll_id || "", createdAt: d.created_at,
   }));
 }
 
-export async function sendMessage(playerId: string, content: string, gifUrl?: string): Promise<void> {
-  const { error } = await supabase.from("messages").insert({ player_id: playerId, content, gif_url: gifUrl || "" });
+export async function sendMessage(playerId: string, content: string, gifUrl?: string, pollId?: string): Promise<void> {
+  const { error } = await supabase.from("messages").insert({ player_id: playerId, content, gif_url: gifUrl || "", poll_id: pollId || null });
   if (error) console.error("sendMessage error:", error.message);
 }
 
@@ -355,7 +356,7 @@ export function subscribeToMessages(callback: (msg: Message) => void) {
     .channel("messages")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
       const d = payload.new as Record<string, unknown>;
-      callback({ id: d.id as string, playerId: d.player_id as string, content: d.content as string, gifUrl: d.gif_url as string || "", createdAt: d.created_at as string });
+      callback({ id: d.id as string, playerId: d.player_id as string, content: d.content as string, gifUrl: (d.gif_url as string) || "", pollId: (d.poll_id as string) || "", createdAt: d.created_at as string });
     })
     .subscribe();
 }
