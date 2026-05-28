@@ -189,7 +189,11 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
           }
 
           return (
-            <div key={msg.id} style={{ display: "flex", flexDirection: isMe ? "row-reverse" : "row", alignItems: "flex-end", gap: "8px", padding: `${msg.isFirst ? "8px" : "2px"} 12px ${msg.isLast ? "4px" : "2px"}` }}>
+            <div
+              key={msg.id}
+              style={{ display: "flex", flexDirection: isMe ? "row-reverse" : "row", alignItems: "flex-end", gap: "8px", padding: `${msg.isFirst ? "8px" : "2px"} 12px ${msg.isLast ? "4px" : "2px"}` }}
+              onMouseLeave={() => { if (showEmojiFor === msg.id) setShowEmojiFor(null); }}
+            >
               <div style={{ width: 32, flexShrink: 0 }}>
                 {msg.isLast && sender && <AvatarDisplay url={sender.avatarUrl} name={sender.name || "?"} size={32} />}
               </div>
@@ -200,50 +204,70 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
                     {sender.status && <span style={{ fontWeight: 400, color: "var(--text-3)" }}> · {sender.status}</span>}
                   </span>
                 )}
-                {isGif ? (
-                  <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid var(--border)", cursor: "pointer" }}
-                    onClick={() => window.open(msg.gifUrl, "_blank")}>
-                    <img src={msg.gifUrl} alt="GIF" style={{ display: "block", maxWidth: "240px", maxHeight: "200px", objectFit: "cover" }} loading="lazy" />
-                  </div>
-                ) : (
-                  <div style={{
-                    background: isMe ? "var(--green)" : "var(--surface)",
-                    color: isMe ? "white" : "var(--text)",
-                    border: isMe ? "none" : "1px solid var(--border)",
-                    borderRadius: isMe ? `12px 12px ${msg.isLast ? "2px" : "12px"} 12px` : `12px 12px 12px ${msg.isLast ? "2px" : "12px"}`,
-                    padding: "8px 12px", fontSize: "14px", lineHeight: 1.5, wordBreak: "break-word",
-                  }}>
-                    {msg.content}
-                  </div>
-                )}
+
+                {/* Bubble + hover react button */}
+                <div style={{ position: "relative", display: "inline-block" }}
+                  onMouseEnter={e => { e.currentTarget.querySelector<HTMLElement>(".react-btn")!.style.opacity = "1"; }}
+                  onMouseLeave={e => { const b = e.currentTarget.querySelector<HTMLElement>(".react-btn"); if (b) b.style.opacity = "0"; }}
+                >
+                  {isGif ? (
+                    <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid var(--border)", cursor: "pointer" }}
+                      onClick={() => window.open(msg.gifUrl, "_blank")}>
+                      <img src={msg.gifUrl} alt="GIF" style={{ display: "block", maxWidth: "240px", maxHeight: "200px", objectFit: "cover" }} loading="lazy" />
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: isMe ? "var(--green)" : "var(--surface)",
+                      color: isMe ? "white" : "var(--text)",
+                      border: isMe ? "none" : "1px solid var(--border)",
+                      borderRadius: isMe ? `12px 12px ${msg.isLast ? "2px" : "12px"} 12px` : `12px 12px 12px ${msg.isLast ? "2px" : "12px"}`,
+                      padding: "8px 12px", fontSize: "14px", lineHeight: 1.5, wordBreak: "break-word",
+                    }}>
+                      {msg.content}
+                    </div>
+                  )}
+
+                  {/* React button — hidden until hover */}
+                  <button
+                    className="react-btn"
+                    onClick={() => setShowEmojiFor(showEmojiFor === msg.id ? null : msg.id)}
+                    style={{
+                      position: "absolute",
+                      [isMe ? "left" : "right"]: "-28px",
+                      top: "50%", transform: "translateY(-50%)",
+                      fontSize: "14px", background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: "99px", cursor: "pointer", padding: "2px 5px", lineHeight: 1,
+                      opacity: showEmojiFor === msg.id ? 1 : 0,
+                      transition: "opacity 0.15s",
+                      whiteSpace: "nowrap",
+                    }}
+                    title="Add reaction"
+                  >
+                    😊
+                  </button>
+                </div>
+
+                {/* Time + delete */}
                 {msg.isLast && (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", padding: "0 4px" }}>
                     <span style={{ fontSize: "10px", color: "var(--text-3)" }}>{formatTime(msg.createdAt)}</span>
                     {canDelete && (
                       <button onClick={() => handleDelete(msg.id)} style={{ fontSize: "10px", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>delete</button>
                     )}
-                    <button
-                      onClick={() => setShowEmojiFor(showEmojiFor === msg.id ? null : msg.id)}
-                      style={{ fontSize: "12px", background: "none", border: "1px solid var(--border)", borderRadius: "99px", cursor: "pointer", padding: "1px 6px", color: "var(--text-3)", lineHeight: 1.4 }}
-                      title="React"
-                    >
-                      😊 +
-                    </button>
                   </div>
                 )}
 
                 {/* Emoji picker for this message */}
                 {showEmojiFor === msg.id && (
-                  <div style={{ position: "relative", zIndex: 100, marginTop: "4px" }}>
+                  <div style={{ zIndex: 100, marginTop: "4px" }}>
                     <EmojiPicker onSelect={emoji => handleReaction(msg.id, emoji)} onClose={() => setShowEmojiFor(null)} />
                   </div>
                 )}
 
-                {/* Reaction pills */}
+                {/* Reaction pills — show on every message */}
                 {(() => {
                   const msgReactions = reactions.filter(r => r.messageId === msg.id);
                   if (!msgReactions.length) return null;
-                  // Group by emoji
                   const grouped: Record<string, { count: number; mine: boolean; players: string[] }> = {};
                   msgReactions.forEach(r => {
                     if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, mine: false, players: [] };
@@ -301,7 +325,12 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
       {!showGif && !showPoll && (
         <div style={{ display: "flex", gap: "4px", padding: "8px 12px 4px", overflowX: "auto", flexShrink: 0 }}>
           {QUICK_REACTIONS.map(emoji => (
-            <button key={emoji} onClick={() => send(emoji)} style={{ fontSize: "20px", padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", flexShrink: 0 }}>
+            <button
+              key={emoji}
+              onClick={() => { setInput(prev => prev + emoji); inputRef.current?.focus(); }}
+              style={{ fontSize: "20px", padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", flexShrink: 0 }}
+              title="Add to message"
+            >
               {emoji}
             </button>
           ))}
