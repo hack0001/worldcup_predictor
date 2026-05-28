@@ -325,20 +325,24 @@ export interface Message {
   id: string;
   playerId: string;
   content: string;
+  gifUrl?: string;
   createdAt: string;
 }
 
-export async function getMessages(limit = 50): Promise<Message[]> {
+export async function getMessages(limit = 100): Promise<Message[]> {
   const { data } = await supabase
     .from("messages")
     .select("*")
     .order("created_at", { ascending: true })
     .limit(limit);
-  return (data || []).map(d => ({ id: d.id, playerId: d.player_id, content: d.content, createdAt: d.created_at }));
+  return (data || []).map(d => ({
+    id: d.id, playerId: d.player_id, content: d.content,
+    gifUrl: d.gif_url || "", createdAt: d.created_at,
+  }));
 }
 
-export async function sendMessage(playerId: string, content: string): Promise<void> {
-  const { error } = await supabase.from("messages").insert({ player_id: playerId, content });
+export async function sendMessage(playerId: string, content: string, gifUrl?: string): Promise<void> {
+  const { error } = await supabase.from("messages").insert({ player_id: playerId, content, gif_url: gifUrl || "" });
   if (error) console.error("sendMessage error:", error.message);
 }
 
@@ -351,7 +355,10 @@ export function subscribeToMessages(callback: (msg: Message) => void) {
     .channel("messages")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
       const d = payload.new as Record<string, unknown>;
-      callback({ id: d.id as string, playerId: d.player_id as string, content: d.content as string, createdAt: d.created_at as string });
+      callback({ id: d.id as string, playerId: d.player_id as string, content: d.content as string, gifUrl: d.gif_url as string || "", createdAt: d.created_at as string });
     })
     .subscribe();
 }
+
+// ── GIF message type ──────────────────────────────────────
+// Messages with gifUrl are GIF messages, content stores the search term
