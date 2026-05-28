@@ -45,6 +45,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   const [showPoll, setShowPoll] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initialScrollDone = useRef(false);
 
   const playerMap = Object.fromEntries(allPlayers.map(p => [p.id, p]));
 
@@ -53,8 +54,6 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     getMessages(100).then(async msgs => {
       setMessages(msgs);
       setLoading(false);
-      // Scroll to bottom after load
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 50);
       // Load reactions for all messages
       const ids = msgs.map(m => m.id);
       getReactions(ids).then(setReactions);
@@ -93,7 +92,20 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!bottomRef.current) return;
+    if (!initialScrollDone.current) {
+      // First load — wait two frames for DOM to fully paint, then jump instantly
+      const raf1 = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ behavior: "instant" });
+          initialScrollDone.current = true;
+        });
+      });
+      return () => cancelAnimationFrame(raf1);
+    } else {
+      // New message — smooth scroll
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const send = async (content: string, gifUrl?: string, pollId?: string) => {
@@ -165,7 +177,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
