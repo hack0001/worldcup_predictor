@@ -1,15 +1,17 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
-const SUGGESTIONS = ["goal", "celebration", "tackle", "referee", "crying", "shock", "VAR", "penalty"];
+// Klipy — free GIF API, built by ex-Tenor team, used by WhatsApp & Discord
+// Get a free key at: klipy.co/developers
+const API_KEY = process.env.NEXT_PUBLIC_KLIPY_API_KEY || "";
+const SUGGESTIONS = ["goal", "celebration", "tackle", "offside", "crying", "shock", "VAR", "penalty"];
 
-interface GifResult {
+interface KlipyGif {
   id: string;
   title: string;
-  images: {
-    fixed_height_small: { url: string };
-    fixed_height: { url: string };
+  media_formats: {
+    tinygif: { url: string };
+    gif: { url: string };
   };
 }
 
@@ -20,7 +22,7 @@ interface Props {
 
 export default function GifPicker({ onSelect, onClose }: Props) {
   const [query, setQuery] = useState("");
-  const [gifs, setGifs] = useState<GifResult[]>([]);
+  const [gifs, setGifs] = useState<KlipyGif[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -28,23 +30,25 @@ export default function GifPicker({ onSelect, onClose }: Props) {
     if (!API_KEY) return;
     setLoading(true);
     try {
-      const url = q.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${API_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=pg-13`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${API_KEY}&limit=24&rating=pg-13`;
-      const res = await fetch(url);
+      const endpoint = q.trim() ? "gifs/search" : "gifs/trending";
+      const params = new URLSearchParams({
+        api_key: API_KEY,
+        limit: "24",
+        contentfilter: "medium",
+        media_filter: "tinygif,gif",
+        ...(q.trim() ? { q } : {}),
+      });
+      const res = await fetch(`https://api.klipy.co/v1/${endpoint}?${params}`);
       const data = await res.json();
-      setGifs(data.data || []);
+      setGifs(data.results || data.data || []);
     } catch (e) {
-      console.error("Giphy error:", e);
+      console.error("Klipy error:", e);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Load trending on mount — in useEffect, NOT during render
-  useEffect(() => {
-    fetchGifs("");
-  }, [fetchGifs]);
+  useEffect(() => { fetchGifs(""); }, [fetchGifs]);
 
   const handleSearch = (value: string) => {
     setQuery(value);
@@ -60,8 +64,8 @@ export default function GifPicker({ onSelect, onClose }: Props) {
   if (!API_KEY) {
     return (
       <div className="card" style={{ padding: "16px", textAlign: "center" }}>
-        <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "10px" }}>
-          Add <code>NEXT_PUBLIC_GIPHY_API_KEY</code> to Vercel env vars to enable GIFs.
+        <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>
+          GIFs need an API key. Get a free one at <strong>klipy.co/developers</strong> then add <code>NEXT_PUBLIC_KLIPY_API_KEY</code> to Vercel.
         </p>
         <button className="btn-secondary" onClick={onClose} style={{ fontSize: "12px" }}>Close</button>
       </div>
@@ -83,7 +87,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         <button onClick={onClose} style={{ fontSize: "18px", background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", lineHeight: 1, padding: "0 4px" }}>✕</button>
       </div>
 
-      {/* Suggestion pills */}
+      {/* Suggestions */}
       <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "10px" }}>
         {SUGGESTIONS.map(s => (
           <button key={s} onClick={() => handleSuggestion(s)} style={{
@@ -92,39 +96,30 @@ export default function GifPicker({ onSelect, onClose }: Props) {
             background: query === s ? "var(--green)" : "var(--surface2)",
             color: query === s ? "white" : "var(--text-2)",
             cursor: "pointer",
-          }}>
-            {s}
-          </button>
+          }}>{s}</button>
         ))}
       </div>
 
-      {/* GIF grid */}
+      {/* Grid */}
       <div style={{ height: "250px", overflowY: "auto" }}>
         {loading && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>
-            Loading...
-          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>Loading...</div>
         )}
         {!loading && gifs.length === 0 && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>
-            No GIFs found
-          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>No GIFs found</div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px" }}>
           {gifs.map(gif => (
             <button
               key={gif.id}
-              onClick={() => onSelect(gif.images.fixed_height.url)}
-              style={{
-                padding: 0, border: "2px solid transparent", borderRadius: "6px",
-                overflow: "hidden", cursor: "pointer", background: "var(--surface2)",
-              }}
+              onClick={() => onSelect(gif.media_formats.gif?.url || gif.media_formats.tinygif.url)}
+              style={{ padding: 0, border: "2px solid transparent", borderRadius: "6px", overflow: "hidden", cursor: "pointer", background: "var(--surface2)" }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--green)")}
               onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
               title={gif.title}
             >
               <img
-                src={gif.images.fixed_height_small.url}
+                src={gif.media_formats.tinygif?.url || gif.media_formats.gif?.url}
                 alt={gif.title}
                 style={{ width: "100%", height: "78px", objectFit: "cover", display: "block" }}
                 loading="lazy"
@@ -134,9 +129,8 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         </div>
       </div>
 
-      {/* Giphy attribution (required by terms) */}
       <div style={{ marginTop: "8px", textAlign: "right" }}>
-        <span style={{ fontSize: "10px", color: "var(--text-3)" }}>Powered by GIPHY</span>
+        <span style={{ fontSize: "10px", color: "var(--text-3)" }}>Powered by Klipy</span>
       </div>
     </div>
   );
