@@ -37,6 +37,7 @@ export interface Player {
   topScorer: string;
   topAssist: string;
   avatarUrl: string;
+  status: string;
   tournamentWinner: string;
   playerOfTournament: string;
   groupPredictions: Record<string, ScorePrediction>;

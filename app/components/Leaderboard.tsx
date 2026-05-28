@@ -158,7 +158,10 @@ export default function Leaderboard({ players, adminState, currentPlayerId }: Pr
                     <span style={{ fontWeight: 800, fontSize: "16px" }}>{player.name}</span>
                     {isMe && <span className="badge" style={{ background: "var(--green-light)", color: "var(--green)", fontSize: "10px" }}>YOU</span>}
                   </div>
-                  <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "6px" }}>{player.teamName}</p>
+                  <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "4px" }}>{player.teamName}</p>
+                  {player.status && (
+                    <p style={{ fontSize: "12px", color: "var(--text-3)", fontStyle: "italic", marginBottom: "4px" }}>"{player.status}"</p>
+                  )}
 
                   {/* Predictions */}
                   <div style={{ display: "flex", gap: "10px", fontSize: "11px", color: "var(--text-3)", flexWrap: "wrap" }}>

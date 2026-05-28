@@ -49,6 +49,7 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
     topScorer: existingPlayer?.topScorer || "",
     topAssist: existingPlayer?.topAssist || "",
     avatarUrl: existingPlayer?.avatarUrl || "",
+    status: existingPlayer?.status || "",
     tournamentWinner: existingPlayer?.tournamentWinner || "",
     playerOfTournament: existingPlayer?.playerOfTournament || "",
   });
@@ -70,6 +71,7 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
       name: form.name, email: form.email, teamName: form.teamName,
       topScorer: form.topScorer, topAssist: form.topAssist,
       avatarUrl: form.avatarUrl,
+      status: form.status,
       tournamentWinner: form.tournamentWinner,
       playerOfTournament: form.playerOfTournament,
       groupPredictions: existingPlayer?.groupPredictions || {},
@@ -104,6 +106,11 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
             <div>
               <label className="label">Team Name *</label>
               <input placeholder="e.g. World Cup Winners FC" value={form.teamName} onChange={(e) => setForm({ ...form, teamName: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Status 😄</label>
+              <input placeholder="e.g. England winning it 🏴󠁧󠁢󠁥󠁮󠁧󠁿" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} maxLength={80} />
+              <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>Shows on the leaderboard and in chat. Keep it fun!</p>
             </div>
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
               <p className="section-title" style={{ marginBottom: "4px" }}>Bonus Predictions</p>
@@ -176,6 +183,11 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
                   <div>
                     <label className="label">Team Name *</label>
                     <input placeholder="e.g. Three Lions FC" value={form.teamName} onChange={(e) => setForm({ ...form, teamName: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="label">Status 😄</label>
+                    <input placeholder="e.g. Mbappe for the golden boot 🔥" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} maxLength={80} />
+                    <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>Shows on the leaderboard. Keep it fun!</p>
                   </div>
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
                     <p style={{ fontWeight: 700, marginBottom: "4px" }}>Bonus Predictions</p>

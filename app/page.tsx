@@ -13,8 +13,9 @@ import AdminPanel from "@/app/components/AdminPanel";
 import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import GroupStandings from "@/app/components/GroupStandings";
 import TeamInfo from "@/app/components/TeamInfo";
+import GroupChat from "@/app/components/GroupChat";
 
-type Tab = "groups" | "knockout" | "predictor-board" | "standings" | "teams" | "fantasy" | "fantasy-board" | "profile" | "admin";
+type Tab = "groups" | "knockout" | "predictor-board" | "standings" | "teams" | "chat" | "fantasy" | "fantasy-board" | "profile" | "admin";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -70,6 +71,7 @@ export default function Home() {
     { id: "knockout", label: "Knockouts", emoji: "⚔️", group: "predict" },
     { id: "standings", label: "Standings", emoji: "📊", group: "predict" },
     { id: "teams", label: "Teams & Form", emoji: "📋", group: "predict" },
+    { id: "chat", label: "Chat", emoji: "💬", group: "predict" },
     { id: "predictor-board", label: "Predictor Board", emoji: "🏆", group: "predict" },
     { id: "fantasy", label: "My Squad", emoji: "👕", group: "fantasy" },
     { id: "fantasy-board", label: "Fantasy Board", emoji: "⭐", group: "fantasy" },
@@ -159,6 +161,13 @@ export default function Home() {
       {activeTab === "predictor-board" && <Leaderboard players={players} adminState={adminState} currentPlayerId={currentPlayer.id} />}
       {activeTab === "standings" && <GroupStandings adminState={adminState} />}
       {activeTab === "teams" && <TeamInfo />}
+      {activeTab === "chat" && (
+        <GroupChat
+          currentPlayer={currentPlayer}
+          allPlayers={players}
+          isAdmin={showAdmin}
+        />
+      )}
       {activeTab === "fantasy" && <FantasySquadPicker player={currentPlayer} />}
       {activeTab === "fantasy-board" && <FantasyLeaderboard players={players} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}
       {activeTab === "profile" && (

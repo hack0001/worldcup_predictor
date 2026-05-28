@@ -31,6 +31,7 @@ export async function savePlayer(player: Player): Promise<void> {
     id: player.id, name: player.name, email: player.email.toLowerCase(),
     team_name: player.teamName, top_scorer: player.topScorer, top_assist: player.topAssist,
     avatar_url: player.avatarUrl || "",
+    status: player.status || "",
     tournament_winner: player.tournamentWinner || "",
     player_of_tournament: player.playerOfTournament || "",
     group_predictions: player.groupPredictions,
@@ -44,6 +45,7 @@ function dbToPlayer(data: Record<string, unknown>): Player {
     teamName: data.team_name as string, topScorer: (data.top_scorer as string) || "",
     topAssist: (data.top_assist as string) || "",
     avatarUrl: (data.avatar_url as string) || "",
+    status: (data.status as string) || "",
     tournamentWinner: (data.tournament_winner as string) || "",
     playerOfTournament: (data.player_of_tournament as string) || "",
     groupPredictions: (data.group_predictions as Player["groupPredictions"]) || {},
@@ -316,4 +318,40 @@ export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[])
     }
   }
   return total;
+}
+
+// ── Messages ──────────────────────────────────────────────
+export interface Message {
+  id: string;
+  playerId: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function getMessages(limit = 50): Promise<Message[]> {
+  const { data } = await supabase
+    .from("messages")
+    .select("*")
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  return (data || []).map(d => ({ id: d.id, playerId: d.player_id, content: d.content, createdAt: d.created_at }));
+}
+
+export async function sendMessage(playerId: string, content: string): Promise<void> {
+  const { error } = await supabase.from("messages").insert({ player_id: playerId, content });
+  if (error) console.error("sendMessage error:", error.message);
+}
+
+export async function deleteMessage(id: string): Promise<void> {
+  await supabase.from("messages").delete().eq("id", id);
+}
+
+export function subscribeToMessages(callback: (msg: Message) => void) {
+  return supabase
+    .channel("messages")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
+      const d = payload.new as Record<string, unknown>;
+      callback({ id: d.id as string, playerId: d.player_id as string, content: d.content as string, createdAt: d.created_at as string });
+    })
+    .subscribe();
 }
