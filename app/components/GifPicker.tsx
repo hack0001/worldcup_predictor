@@ -7,13 +7,13 @@ const API_KEY = process.env.NEXT_PUBLIC_KLIPY_API_KEY || "";
 const SUGGESTIONS = ["goal", "celebration", "tackle", "offside", "crying", "shock", "VAR", "penalty"];
 
 interface KlipyGif {
-  id: string;
+  id: number;
   title?: string;
-  media_formats?: { tinygif?: { url: string }; gif?: { url: string } };
-  // Klipy also returns these directly
-  preview_url?: string;
-  url?: string;
-  media?: Array<{ tinygif?: { url: string }; gif?: { url: string } }>;
+  file: {
+    hd: { gif: { url: string } };
+    sm: { gif: { url: string } };
+    xs: { gif: { url: string } };
+  };
 }
 
 interface Props {
@@ -37,8 +37,9 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         : `${base}/trending?limit=24`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setGifs(data.data || data.results || []);
+      const json = await res.json();
+      // Klipy: { result: true, data: { data: [...gifs] } }
+      setGifs(json?.data?.data || []);
     } catch (e) {
       console.error("Klipy error:", e);
       setGifs([]);
@@ -108,21 +109,13 @@ export default function GifPicker({ onSelect, onClose }: Props) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>No GIFs found</div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px" }}>
-          {gifs.map((gif, idx) => {
-            // Handle various Klipy response structures
-            const previewUrl = gif.media_formats?.tinygif?.url
-              || gif.media?.[0]?.tinygif?.url
-              || gif.preview_url
-              || gif.url
-              || "";
-            const fullUrl = gif.media_formats?.gif?.url
-              || gif.media?.[0]?.gif?.url
-              || gif.url
-              || previewUrl;
+          {gifs.map((gif) => {
+            const previewUrl = gif.file?.sm?.gif?.url || gif.file?.xs?.gif?.url || "";
+            const fullUrl = gif.file?.hd?.gif?.url || previewUrl;
             if (!previewUrl) return null;
             return (
               <button
-                key={gif.id || idx}
+                key={gif.id}
                 onClick={() => onSelect(fullUrl)}
                 style={{ padding: 0, border: "2px solid transparent", borderRadius: "6px", overflow: "hidden", cursor: "pointer", background: "var(--surface2)" }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--green)")}
