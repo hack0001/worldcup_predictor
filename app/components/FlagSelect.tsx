@@ -4,7 +4,7 @@ import { SQUADS, TEAM_FLAGS } from "@/app/data/worldcup";
 
 interface FlagSelectProps {
   label: string;
-  value: string; // player name
+  value: string;
   onChange: (player: string) => void;
 }
 
@@ -13,7 +13,6 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  // Find which country the current player belongs to
   const currentCountry = value
     ? Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === value))?.[0] || ""
     : "";
@@ -23,7 +22,6 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
     return code ? `https://flagcdn.com/w40/${code}.png` : null;
   };
 
-  // Flat list of all players with country info, filtered by search
   const allPlayers = Object.entries(SQUADS).flatMap(([country, { players }]) =>
     players.map(p => ({ name: p.name, country }))
   ).sort((a, b) => a.name.localeCompare(b.name));
@@ -35,7 +33,9 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
       )
     : allPlayers;
 
-  // Close on outside click
+  // Is the current value a custom entry (not in squads)?
+  const isCustom = value && !allPlayers.some(p => p.name === value);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -44,8 +44,8 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const select = (player: { name: string; country: string }) => {
-    onChange(player.name);
+  const select = (name: string) => {
+    onChange(name);
     setOpen(false);
     setSearch("");
   };
@@ -59,30 +59,22 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
     <div ref={ref} style={{ position: "relative" }}>
       <label className="label">{label}</label>
 
-      {/* Trigger button */}
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => { setOpen(!open); setSearch(value && isCustom ? value : ""); }}
         style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          padding: "9px 12px",
-          background: "var(--surface)",
-          border: "1.5px solid var(--border-strong)",
-          borderRadius: "var(--radius)",
-          cursor: "pointer",
-          textAlign: "left",
-          fontSize: "14px",
+          width: "100%", display: "flex", alignItems: "center", gap: "8px",
+          padding: "9px 12px", background: "var(--surface)",
+          border: "1.5px solid var(--border-strong)", borderRadius: "var(--radius)",
+          cursor: "pointer", textAlign: "left", fontSize: "14px",
           color: value ? "var(--text)" : "var(--text-3)",
-          transition: "border-color 0.15s",
           borderColor: open ? "var(--green)" : undefined,
         }}
       >
         {value && currentCountry && flagUrl(currentCountry) && (
           <img src={flagUrl(currentCountry)!} alt={currentCountry} width={20} height={14} style={{ borderRadius: "2px", objectFit: "cover", flexShrink: 0 }} />
         )}
+        {isCustom && <span style={{ fontSize: "12px" }}>✏️</span>}
         <span style={{ flex: 1 }}>{value || "Select a player..."}</span>
         {value && (
           <span onClick={clear} style={{ color: "var(--text-3)", fontSize: "16px", lineHeight: 1, padding: "0 2px" }}>×</span>
@@ -90,38 +82,50 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
         <span style={{ color: "var(--text-3)", fontSize: "10px" }}>{open ? "▲" : "▼"}</span>
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div style={{
-          position: "absolute",
-          top: "100%",
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          background: "var(--surface)",
-          border: "1.5px solid var(--green)",
-          borderRadius: "var(--radius)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          marginTop: "4px",
-          overflow: "hidden",
+          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+          background: "var(--surface)", border: "1.5px solid var(--green)",
+          borderRadius: "var(--radius)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          marginTop: "4px", overflow: "hidden",
         }}>
-          {/* Search */}
+          {/* Search / custom entry input */}
           <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
             <input
               autoFocus
               type="text"
-              placeholder="Search player or country..."
+              placeholder="Search or type a custom name..."
               value={search}
               onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && search.trim()) select(search.trim()); }}
               style={{ margin: 0 }}
               onClick={e => e.stopPropagation()}
             />
           </div>
 
+          {/* Custom entry option */}
+          {search.trim() && !filtered.some(p => p.name.toLowerCase() === search.toLowerCase()) && (
+            <button
+              type="button"
+              onClick={() => select(search.trim())}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: "10px",
+                padding: "9px 12px", background: "var(--green-light)", border: "none",
+                borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "left", fontSize: "13px",
+              }}
+            >
+              <span style={{ fontSize: "14px" }}>✏️</span>
+              <span style={{ flex: 1, fontWeight: 600 }}>Use "{search.trim()}"</span>
+              <span style={{ fontSize: "11px", color: "var(--text-3)" }}>custom entry</span>
+            </button>
+          )}
+
           {/* Player list */}
-          <div style={{ maxHeight: "260px", overflowY: "auto" }}>
+          <div style={{ maxHeight: "240px", overflowY: "auto" }}>
             {filtered.length === 0 && (
-              <div style={{ padding: "12px", fontSize: "13px", color: "var(--text-3)", textAlign: "center" }}>No players found</div>
+              <div style={{ padding: "12px", fontSize: "13px", color: "var(--text-3)", textAlign: "center" }}>
+                No players found — press Enter to use custom name
+              </div>
             )}
             {filtered.map(p => {
               const flag = flagUrl(p.country);
@@ -130,20 +134,13 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
                 <button
                   key={`${p.country}-${p.name}`}
                   type="button"
-                  onClick={() => select(p)}
+                  onClick={() => select(p.name)}
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
+                    width: "100%", display: "flex", alignItems: "center", gap: "10px",
                     padding: "9px 12px",
                     background: isSelected ? "var(--green-light)" : "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: "13px",
-                    color: "var(--text)",
-                    borderBottom: "1px solid var(--border)",
+                    border: "none", cursor: "pointer", textAlign: "left", fontSize: "13px",
+                    color: "var(--text)", borderBottom: "1px solid var(--border)",
                   }}
                   onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "var(--bg)"; }}
                   onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}

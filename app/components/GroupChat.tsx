@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
 import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
@@ -102,7 +102,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     return () => { channel.unsubscribe(); };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = messagesContainerRef.current;
     if (container) container.scrollTop = container.scrollHeight;
   });
@@ -176,7 +176,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, height: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
