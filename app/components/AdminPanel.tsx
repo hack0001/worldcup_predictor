@@ -23,6 +23,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [password, setPassword] = useState("");
   const [pwError, setPwError] = useState("");
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form">("results");
+  const [viewingUser, setViewingUser] = useState<Player | null>(null);
+  const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
@@ -41,7 +43,20 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   useEffect(() => {
     if (authenticated) {
       getAllPlayerStats().then(setStats);
-      getPlayers().then(setUsers);
+      getPlayers().then(async players => {
+        setUsers(players);
+        // Load fantasy squads for all users
+        const { supabase } = await import("@/lib/supabase");
+        const { data } = await supabase.from("fantasy_squads").select("player_id, squad");
+        if (data) {
+          const map: Record<string, string[]> = {};
+          data.forEach(row => {
+            const squad = (row.squad as { name: string }[]) || [];
+            map[row.player_id] = squad.map(p => p.name);
+          });
+          setUserFantasySquads(map);
+        }
+      });
       getAllTeamForms().then(setTeamForms);
     }
   }, [authenticated]);
@@ -499,76 +514,193 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
       {/* ── USERS SECTION ── */}
       {activeSection === "users" && (
         <div>
-          <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
-            {users.length} player{users.length !== 1 ? "s" : ""} registered. You can edit their name/team or delete their account.
-          </p>
-          <div style={{ display: "grid", gap: "8px" }}>
-            {users.map(u => (
-              <div key={u.id} className="card" style={{ padding: "14px 16px" }}>
-                {editingUser?.id === u.id ? (
-                  <div style={{ display: "grid", gap: "10px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                      <div>
-                        <label className="label">Name</label>
-                        <input value={editingUser.name} onChange={e => setEditingUser({ ...editingUser, name: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className="label">Team Name</label>
-                        <input value={editingUser.teamName} onChange={e => setEditingUser({ ...editingUser, teamName: e.target.value })} />
-                      </div>
+          {/* User detail modal */}
+          {viewingUser && (
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <div>
+                  <h3 style={{ fontSize: "15px", fontWeight: 700 }}>{viewingUser.name}</h3>
+                  <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{viewingUser.teamName} · {viewingUser.email}</p>
+                </div>
+                <button className="btn-secondary" onClick={() => setViewingUser(null)} style={{ fontSize: "12px" }}>← Back to users</button>
+              </div>
+
+              {/* Bonus predictions */}
+              <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>🎯 Bonus Predictions</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "13px" }}>
+                  <div><span style={{ color: "var(--text-3)" }}>Golden Boot:</span> <strong>{viewingUser.topScorer || "—"}</strong></div>
+                  <div><span style={{ color: "var(--text-3)" }}>Top Assist:</span> <strong>{viewingUser.topAssist || "—"}</strong></div>
+                  <div><span style={{ color: "var(--text-3)" }}>Tournament Winner:</span> <strong>{viewingUser.tournamentWinner || "—"}</strong></div>
+                  <div><span style={{ color: "var(--text-3)" }}>Player of Tournament:</span> <strong>{viewingUser.playerOfTournament || "—"}</strong></div>
+                </div>
+              </div>
+
+              {/* Group predictions */}
+              <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
+                  ⚽ Group Predictions ({Object.keys(viewingUser.groupPredictions).length} of {Object.values(GROUPS).flat().length} matches)
+                </p>
+                {Object.entries(GROUPS).map(([group, teams]) => {
+                  const groupMatches = GROUP_MATCHES.filter(m =>
+                    teams.includes(m.home) && teams.includes(m.away)
+                  );
+                  const hasPreds = groupMatches.some(m => viewingUser.groupPredictions[m.id]);
+                  if (!hasPreds) return null;
+                  return (
+                    <div key={group} style={{ marginBottom: "10px" }}>
+                      <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "5px" }}>GROUP {group}</p>
+                      {groupMatches.map(m => {
+                        const pred = viewingUser.groupPredictions[m.id];
+                        if (!pred) return null;
+                        return (
+                          <div key={m.id} style={{ display: "flex", gap: "8px", alignItems: "center", padding: "4px 0", fontSize: "12px", borderBottom: "1px solid var(--border)" }}>
+                            <span style={{ flex: 1, textAlign: "right" }}>{typeof m.home === "string" ? m.home : (m.home as {team: string}).team}</span>
+                            <span style={{ fontWeight: 800, color: "var(--green)", minWidth: "40px", textAlign: "center" }}>
+                              {pred.home ?? "?"} – {pred.away ?? "?"}
+                            </span>
+                            <span style={{ flex: 1 }}>{typeof m.away === "string" ? m.away : (m.away as {team: string}).team}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                      <div>
-                        <label className="label">Email</label>
-                        <input type="email" value={editingUser.email} onChange={e => setEditingUser({ ...editingUser, email: e.target.value })} />
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button className="btn-primary" onClick={async () => {
-                        await savePlayer(editingUser);
-                        setUsers(users.map(us => us.id === editingUser.id ? editingUser : us));
-                        setEditingUser(null);
-                      }}>Save</button>
-                      <button className="btn-secondary" onClick={() => setEditingUser(null)}>Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-                      {u.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: 600, fontSize: "14px" }}>{u.name}</p>
-                      <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{u.teamName}</p>
-                      <p style={{ fontSize: "11px", color: "var(--text-3)" }}>{u.email}</p>
-                      <div style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "3px", display: "flex", gap: "10px" }}>
-                        <span>⚽ {u.topScorer || "—"}</span>
-                        <span>🎯 {u.topAssist || "—"}</span>
-                        <span>🏆 {u.tournamentWinner || "—"}</span>
-                        <span>{Object.keys(u.groupPredictions).length} group preds</span>
-                        <span>{Object.keys(u.knockoutPredictions).length} KO preds</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                      <button className="btn-secondary" onClick={() => setEditingUser(u)} style={{ fontSize: "12px", padding: "5px 10px" }}>Edit</button>
-                      <button
-                        className="btn-ghost"
-                        style={{ color: "var(--red)", fontSize: "12px" }}
-                        onClick={async () => {
-                          if (!confirm(`Delete ${u.name}? This cannot be undone.`)) return;
-                          const { supabase } = await import("@/lib/supabase");
-                          await supabase.from("players").delete().eq("id", u.id);
-                          setUsers(users.filter(us => us.id !== u.id));
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                  );
+                })}
+                {Object.keys(viewingUser.groupPredictions).length === 0 && (
+                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No group predictions yet</p>
                 )}
               </div>
-            ))}
-          </div>
+
+              {/* Knockout predictions */}
+              <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
+                  🏆 Knockout Predictions ({Object.keys(viewingUser.knockoutPredictions).length} matches)
+                </p>
+                {Object.keys(viewingUser.knockoutPredictions).length > 0 ? (
+                  <div style={{ display: "grid", gap: "6px" }}>
+                    {Object.entries(viewingUser.knockoutPredictions).map(([matchId, pred]) => {
+                      const home = pred.homeTeam || matchId;
+                      const away = pred.awayTeam || "";
+                      return (
+                        <div key={matchId} style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                          <span style={{ fontSize: "10px", color: "var(--text-3)", minWidth: "55px" }}>{matchId.replace(/-/g, " ").toUpperCase()}</span>
+                          <span style={{ flex: 1, textAlign: "right" }}>{home}</span>
+                          <span style={{ fontWeight: 800, color: "var(--green)", minWidth: "50px", textAlign: "center" }}>
+                            {pred.homeScore} – {pred.awayScore}
+                            {pred.goesToET ? " (ET)" : ""}
+                            {pred.goesToPens ? " (P)" : ""}
+                          </span>
+                          <span style={{ flex: 1 }}>{away}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No knockout predictions yet</p>
+                )}
+              </div>
+
+              {/* Fantasy squad */}
+              <div className="card" style={{ padding: "14px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
+                  👕 Fantasy Squad ({(userFantasySquads[viewingUser.id] || []).length}/11 players)
+                </p>
+                {(userFantasySquads[viewingUser.id] || []).length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {(userFantasySquads[viewingUser.id] || []).map(name => {
+                      const entry = Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === name));
+                      const pos = entry?.[1]?.players.find(p => p.name === name)?.position;
+                      const posColors: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#22c55e", FWD: "#ef4444" };
+                      return (
+                        <span key={name} style={{ fontSize: "12px", padding: "3px 9px", borderRadius: "99px", background: posColors[pos || "FWD"] + "15", color: posColors[pos || "FWD"], border: `1px solid ${posColors[pos || "FWD"]}33`, fontWeight: 600 }}>
+                          {pos && <span style={{ fontSize: "10px", opacity: 0.8, marginRight: "3px" }}>{pos}</span>}
+                          {name}
+                          {entry && <span style={{ fontSize: "10px", opacity: 0.6, marginLeft: "3px" }}>· {entry[0]}</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No fantasy squad picked yet</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Users list */}
+          {!viewingUser && (
+            <div>
+              <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+                {users.length} player{users.length !== 1 ? "s" : ""} registered. Click View to see their predictions and fantasy squad.
+              </p>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {users.map(u => (
+                  <div key={u.id} className="card" style={{ padding: "14px 16px" }}>
+                    {editingUser?.id === u.id ? (
+                      <div style={{ display: "grid", gap: "10px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label className="label">Name</label>
+                            <input value={editingUser.name} onChange={e => setEditingUser({ ...editingUser, name: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className="label">Team Name</label>
+                            <input value={editingUser.teamName} onChange={e => setEditingUser({ ...editingUser, teamName: e.target.value })} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="label">Email</label>
+                          <input type="email" value={editingUser.email} onChange={e => setEditingUser({ ...editingUser, email: e.target.value })} />
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button className="btn-primary" onClick={async () => {
+                            await savePlayer(editingUser);
+                            setUsers(users.map(us => us.id === editingUser.id ? editingUser : us));
+                            setEditingUser(null);
+                          }}>Save</button>
+                          <button className="btn-secondary" onClick={() => setEditingUser(null)}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600, fontSize: "14px" }}>{u.name}</p>
+                          <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{u.teamName}</p>
+                          <div style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <span>⚽ {u.topScorer || "—"}</span>
+                            <span>🎯 {u.topAssist || "—"}</span>
+                            <span>🏆 {u.tournamentWinner || "—"}</span>
+                            <span>{Object.keys(u.groupPredictions).length} group preds</span>
+                            <span>{Object.keys(u.knockoutPredictions).length} KO preds</span>
+                            <span>👕 {(userFantasySquads[u.id] || []).length}/11 squad</span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                          <button className="btn-primary" onClick={() => setViewingUser(u)} style={{ fontSize: "12px", padding: "5px 12px" }}>View</button>
+                          <button className="btn-secondary" onClick={() => setEditingUser(u)} style={{ fontSize: "12px", padding: "5px 10px" }}>Edit</button>
+                          <button
+                            className="btn-ghost"
+                            style={{ color: "var(--red)", fontSize: "12px" }}
+                            onClick={async () => {
+                              if (!confirm(`Delete ${u.name}? This cannot be undone.`)) return;
+                              const { supabase } = await import("@/lib/supabase");
+                              await supabase.from("players").delete().eq("id", u.id);
+                              setUsers(users.filter(us => us.id !== u.id));
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
