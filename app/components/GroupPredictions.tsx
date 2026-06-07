@@ -30,13 +30,31 @@ interface Props {
 export default function GroupPredictions({ player, onUpdate, readonly }: Props) {
   const [activeGroup, setActiveGroup] = useState("A");
   const [forms, setForms] = useState<Record<string, TeamForm>>({});
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     getAllTeamForms().then(setForms);
+    // Update clock every minute so locks apply in real time
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
-  const updateScore = async (matchId: string, side: "home" | "away", value: string) => {
-    if (readonly) return;
+  // Parse "11 Jun" + "20:00 BST" into a Date — lock 5 mins before kickoff
+  const isMatchLocked = (dateUK: string, timeUK: string): boolean => {
+    try {
+      const [day, mon] = dateUK.split(" ");
+      const [hh, mm] = timeUK.replace(/ BST| GMT/, "").split(":");
+      const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+      // BST = UTC+1, so subtract 1 hour to get UTC
+      const isBST = timeUK.includes("BST");
+      const kickoff = new Date(Date.UTC(2026, months[mon], Number(day), Number(hh) - (isBST ? 1 : 0), Number(mm)));
+      // Lock 5 minutes before kickoff
+      return now >= new Date(kickoff.getTime() - 5 * 60 * 1000);
+    } catch { return false; }
+  };
+
+  const updateScore = async (matchId: string, side: "home" | "away", value: string, dateUK: string, timeUK: string) => {
+    if (readonly || isMatchLocked(dateUK, timeUK)) return;
     const v = value.replace(/\D/g, "").slice(0, 2);
     const updated = {
       ...player,
@@ -130,11 +148,15 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
               {matches.map(match => {
                 const pred = player.groupPredictions[match.id];
                 const filled = pred?.home !== "" && pred?.away !== "" && pred?.home !== undefined;
+                const locked = isMatchLocked(match.dateUK, match.timeUK);
                 return (
-                  <div key={match.id} className="card" style={{ padding: "10px 14px", borderColor: filled ? "#bbf7d0" : undefined }}>
+                  <div key={match.id} className="card" style={{ padding: "10px 14px", borderColor: locked ? "#fde68a" : filled ? "#bbf7d0" : undefined, opacity: locked ? 0.85 : 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "7px" }}>
                       <span style={{ fontSize: "11px", color: "var(--text-3)" }}>📅 {match.dateUK} · {match.timeUK}</span>
-                      <span style={{ fontSize: "11px", color: "var(--text-3)" }}>🏟️ {match.stadium}, {match.city}</span>
+                      {locked
+                        ? <span style={{ fontSize: "10px", fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 6px", borderRadius: "4px" }}>🔒 Locked</span>
+                        : <span style={{ fontSize: "11px", color: "var(--text-3)" }}>🏟️ {match.stadium}, {match.city}</span>
+                      }
                     </div>
                     {/* Inline form row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -155,9 +177,9 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
                         <Flag country={match.home.team} /> {match.home.team}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value)} disabled={readonly} />
+                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
                         <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value)} disabled={readonly} />
+                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
                       </div>
                       <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
                         <Flag country={match.away.team} /> {match.away.team}

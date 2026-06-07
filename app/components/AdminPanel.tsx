@@ -539,7 +539,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               {/* Group predictions */}
               <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
                 <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
-                  ⚽ Group Predictions ({Object.keys(viewingUser.groupPredictions).length} of {Object.values(GROUPS).flat().length} matches)
+                  ⚽ Group Predictions ({Object.keys(viewingUser.groupPredictions).length} of {GROUP_MATCHES.length} matches)
                 </p>
                 {Object.entries(GROUPS).map(([group, teams]) => {
                   const groupMatches = GROUP_MATCHES.filter(m =>
@@ -630,9 +630,44 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           {/* Users list */}
           {!viewingUser && (
             <div>
-              <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+              <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
                 {users.length} player{users.length !== 1 ? "s" : ""} registered. Click View to see their predictions and fantasy squad.
               </p>
+
+              {/* Missing predictions alert */}
+              {(() => {
+                const incomplete = users.filter(u =>
+                  Object.keys(u.groupPredictions).length < GROUP_MATCHES.length ||
+                  !u.topScorer || !u.tournamentWinner || !u.playerOfTournament
+                );
+                if (!incomplete.length) return (
+                  <div className="card" style={{ padding: "10px 14px", marginBottom: "12px", borderLeft: "3px solid var(--green)", fontSize: "13px" }}>
+                    ✅ All players have completed their predictions!
+                  </div>
+                );
+                return (
+                  <div className="card" style={{ padding: "12px 14px", marginBottom: "12px", borderLeft: "3px solid #f59e0b" }}>
+                    <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px", color: "#92400e" }}>⚠️ Incomplete predictions ({incomplete.length} player{incomplete.length !== 1 ? "s" : ""})</p>
+                    <div style={{ display: "grid", gap: "4px" }}>
+                      {incomplete.map(u => {
+                        const missing: string[] = [];
+                        const gDone = Object.keys(u.groupPredictions).length;
+                        if (gDone < GROUP_MATCHES.length) missing.push(`${GROUP_MATCHES.length - gDone} group matches`);
+                        if (!u.topScorer) missing.push("Golden Boot");
+                        if (!u.topAssist) missing.push("Top Assist");
+                        if (!u.tournamentWinner) missing.push("Tournament Winner");
+                        if (!u.playerOfTournament) missing.push("Player of Tournament");
+                        return (
+                          <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px" }}>
+                            <span style={{ fontWeight: 600, minWidth: "100px" }}>{u.name}</span>
+                            <span style={{ color: "var(--text-3)" }}>missing: {missing.join(", ")}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ display: "grid", gap: "8px" }}>
                 {users.map(u => (
                   <div key={u.id} className="card" style={{ padding: "14px 16px" }}>
@@ -651,6 +686,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                         <div>
                           <label className="label">Email</label>
                           <input type="email" value={editingUser.email} onChange={e => setEditingUser({ ...editingUser, email: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="label">Status</label>
+                          <input placeholder="e.g. England winning it 🏴󠁧󠁢󠁥󠁮󠁧󠁿" value={editingUser.status || ""} onChange={e => setEditingUser({ ...editingUser, status: e.target.value })} maxLength={80} />
                         </div>
                         <div style={{ display: "flex", gap: "8px" }}>
                           <button className="btn-primary" onClick={async () => {
@@ -673,7 +712,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                             <span>⚽ {u.topScorer || "—"}</span>
                             <span>🎯 {u.topAssist || "—"}</span>
                             <span>🏆 {u.tournamentWinner || "—"}</span>
-                            <span>{Object.keys(u.groupPredictions).length} group preds</span>
+                            <span>{Object.keys(u.groupPredictions).length}/{GROUP_MATCHES.length} group</span>
                             <span>{Object.keys(u.knockoutPredictions).length} KO preds</span>
                             <span>👕 {(userFantasySquads[u.id] || []).length}/11 squad</span>
                           </div>

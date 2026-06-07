@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Player, KnockoutPrediction } from "@/app/data/types";
 import { KNOCKOUT_MATCHES, GROUPS } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
@@ -30,6 +30,23 @@ const EMPTY_PRED: KnockoutPrediction = {
 
 export default function KnockoutPredictions({ player, onUpdate, readonly, confirmedTeams = {} }: Props) {
   const [activeRound, setActiveRound] = useState<RoundId>("r32");
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isMatchLocked = (dateUK: string, timeUK: string): boolean => {
+    try {
+      const [day, mon] = dateUK.split(" ");
+      const [hh, mm] = timeUK.replace(/ BST| GMT/, "").split(":");
+      const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+      const isBST = timeUK.includes("BST");
+      const kickoff = new Date(Date.UTC(2026, months[mon], Number(day), Number(hh) - (isBST ? 1 : 0), Number(mm)));
+      return now >= new Date(kickoff.getTime() - 5 * 60 * 1000);
+    } catch { return false; }
+  };
 
   const update = async (matchId: string, patch: Partial<KnockoutPrediction>) => {
     if (readonly) return;
@@ -107,13 +124,18 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
           const awayTeam = confirmed?.away || "";
           const hasTeams = !!(homeTeam && awayTeam);
           const isFinal = match.id === "final-104";
+          const locked = isMatchLocked(match.dateUK, match.timeUK);
+          const isDisabled = readonly || !hasTeams || locked;
 
           return (
-            <div key={match.id} className="card" style={{ padding: "14px", borderColor: isFinal ? "#fbbf24" : hasTeams ? "#bbf7d0" : undefined, background: isFinal ? "#fffbeb" : undefined, opacity: hasTeams ? 1 : 0.5 }}>
+            <div key={match.id} className="card" style={{ padding: "14px", borderColor: locked ? "#fde68a" : isFinal ? "#fbbf24" : hasTeams ? "#bbf7d0" : undefined, background: isFinal ? "#fffbeb" : undefined, opacity: hasTeams ? 1 : 0.5 }}>
               {/* Date/venue */}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
                 <span style={{ fontSize: "10px", color: "var(--text-3)" }}>📅 {match.dateUK} · {match.timeUK}</span>
-                <span style={{ fontSize: "10px", color: "var(--text-3)" }}>🏟️ {match.stadium}</span>
+                {locked
+                  ? <span style={{ fontSize: "10px", fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 6px", borderRadius: "4px" }}>🔒 Locked</span>
+                  : <span style={{ fontSize: "10px", color: "var(--text-3)" }}>🏟️ {match.stadium}</span>
+                }
               </div>
               <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-2)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 {match.label} <span style={{ color: "var(--text-3)", fontWeight: 400, textTransform: "none" }}>— {match.placeholder}</span>
@@ -127,9 +149,9 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                     {homeTeam || <span style={{ color: "var(--text-3)", fontStyle: "italic", fontSize: "11px" }}>{match.placeholder.split(" vs ")[0]}</span>}
                   </span>
                 </div>
-                <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.homeScore} onChange={e => scoreInput(match.id, "homeScore", e.target.value)} disabled={readonly || !hasTeams} style={{ fontSize: "14px", opacity: hasTeams ? 1 : 0.4 }} />
+                <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.homeScore} onChange={e => scoreInput(match.id, "homeScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "14px", opacity: hasTeams ? 1 : 0.4 }} />
                 <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
-                <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.awayScore} onChange={e => scoreInput(match.id, "awayScore", e.target.value)} disabled={readonly || !hasTeams} style={{ fontSize: "14px", opacity: hasTeams ? 1 : 0.4 }} />
+                <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.awayScore} onChange={e => scoreInput(match.id, "awayScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "14px", opacity: hasTeams ? 1 : 0.4 }} />
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                   {awayTeam && <Flag country={awayTeam} size={16} />}
                   <span style={{ fontSize: "12px", fontWeight: 600 }}>
@@ -141,8 +163,8 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
               {/* ET + Pens */}
               {hasTeams && (
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: readonly ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToET ? "8px" : 0 }}>
-                    <input type="checkbox" checked={pred.goesToET} disabled={readonly}
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToET ? "8px" : 0 }}>
+                    <input type="checkbox" checked={pred.goesToET} disabled={isDisabled}
                       onChange={e => update(match.id, { goesToET: e.target.checked, goesToPens: e.target.checked ? pred.goesToPens : false })}
                       style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
                     Goes to extra time?
@@ -155,15 +177,15 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                         <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>ET score (after 120 mins)</p>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <span style={{ fontSize: "11px", color: "var(--text-2)", minWidth: "60px", textAlign: "right" }}>{homeTeam}</span>
-                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etHomeScore} onChange={e => scoreInput(match.id, "etHomeScore", e.target.value)} disabled={readonly} style={{ fontSize: "13px" }} />
+                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etHomeScore} onChange={e => scoreInput(match.id, "etHomeScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "13px" }} />
                           <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
-                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etAwayScore} onChange={e => scoreInput(match.id, "etAwayScore", e.target.value)} disabled={readonly} style={{ fontSize: "13px" }} />
+                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etAwayScore} onChange={e => scoreInput(match.id, "etAwayScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "13px" }} />
                           <span style={{ fontSize: "11px", color: "var(--text-2)" }}>{awayTeam}</span>
                         </div>
                       </div>
 
-                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: readonly ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToPens ? "6px" : 0 }}>
-                        <input type="checkbox" checked={pred.goesToPens} disabled={readonly}
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToPens ? "6px" : 0 }}>
+                        <input type="checkbox" checked={pred.goesToPens} disabled={isDisabled}
                           onChange={e => update(match.id, { goesToPens: e.target.checked, penWinner: "" })}
                           style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
                         Goes to penalties?
@@ -173,7 +195,7 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                       {pred.goesToPens && (
                         <div style={{ paddingLeft: "22px" }}>
                           <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>Who wins on penalties?</p>
-                          <select value={pred.penWinner} onChange={e => update(match.id, { penWinner: e.target.value })} disabled={readonly} style={{ fontSize: "12px", padding: "6px 8px" }}>
+                          <select value={pred.penWinner} onChange={e => update(match.id, { penWinner: e.target.value })} disabled={isDisabled} style={{ fontSize: "12px", padding: "6px 8px" }}>
                             <option value="">-- Pick winner --</option>
                             {[homeTeam, awayTeam].map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
