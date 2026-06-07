@@ -7,7 +7,14 @@ import { getFantasySquad, saveFantasySquad } from "@/lib/storage";
 interface Props { player: Player; }
 
 const POSITIONS: FantasyPlayer["position"][] = ["GK", "DEF", "MID", "FWD"];
-const POSITION_LIMITS = { GK: 1, DEF: 4, MID: 3, FWD: 3 };
+const FORMATIONS: Record<string, { DEF: number; MID: number; FWD: number; label: string }> = {
+  "4-3-3": { DEF: 4, MID: 3, FWD: 3, label: "4-3-3" },
+  "4-4-2": { DEF: 4, MID: 4, FWD: 2, label: "4-4-2" },
+  "4-5-1": { DEF: 4, MID: 5, FWD: 1, label: "4-5-1" },
+  "3-5-2": { DEF: 3, MID: 5, FWD: 2, label: "3-5-2" },
+  "3-4-3": { DEF: 3, MID: 4, FWD: 3, label: "3-4-3" },
+};
+const DEFAULT_FORMATION = "4-3-3";
 const POSITION_COLORS: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#22c55e", FWD: "#ef4444" };
 const POSITION_BG: Record<string, string> = { GK: "#fef3c7", DEF: "#dbeafe", MID: "#dcfce7", FWD: "#fee2e2" };
 
@@ -75,7 +82,7 @@ function EmptySlot({ position }: { position: FantasyPlayer["position"] }) {
   );
 }
 
-function PitchView({ squad, onRemove }: { squad: FantasyPlayer[]; onRemove: (name: string) => void }) {
+function PitchView({ squad, onRemove, positionLimits }: { squad: FantasyPlayer[]; onRemove: (name: string) => void; positionLimits: { GK: number; DEF: number; MID: number; FWD: number; label?: string } }) {
   const byPos: Record<string, FantasyPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
 
@@ -83,7 +90,7 @@ function PitchView({ squad, onRemove }: { squad: FantasyPlayer[]; onRemove: (nam
     <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-start", padding: "10px 4px" }}>
       {byPos[pos].length > 0
         ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
-        : Array.from({ length: POSITION_LIMITS[pos] }).map((_, i) => <EmptySlot key={i} position={pos} />)
+        : Array.from({ length: positionLimits[pos] || 0 }).map((_, i) => <EmptySlot key={i} position={pos} />)
       }
     </div>
   );
@@ -115,6 +122,7 @@ function PitchView({ squad, onRemove }: { squad: FantasyPlayer[]; onRemove: (nam
 // ── Main Component ─────────────────────────────────────────
 export default function FantasySquadPicker({ player }: Props) {
   const [squad, setSquad] = useState<FantasyPlayer[]>([]);
+  const [formation, setFormation] = useState(DEFAULT_FORMATION);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -126,21 +134,40 @@ export default function FantasySquadPicker({ player }: Props) {
   useEffect(() => {
     getFantasySquad(player.id).then(existing => {
       if (existing?.squad?.length) setSquad(existing.squad);
+      if ((existing as { formation?: string })?.formation) setFormation((existing as { formation?: string }).formation!);
       setLoading(false);
     });
   }, [player.id]);
 
-  const persist = async (newSquad: FantasyPlayer[]) => {
+  const POSITION_LIMITS = { GK: 1, ...FORMATIONS[formation] };
+
+  const persist = async (newSquad: FantasyPlayer[], newFormation = formation) => {
     setSaving(true);
-    const fs: FantasySquadType = { id: player.id, playerId: player.id, squad: newSquad, round: "group", updatedAt: new Date().toISOString() };
-    await saveFantasySquad(fs);
+    const fs = { id: player.id, playerId: player.id, squad: newSquad, formation: newFormation, round: "group", updatedAt: new Date().toISOString() } as FantasySquadType & { formation: string };
+    await saveFantasySquad(fs as unknown as FantasySquadType);
     setSaved(true); setSaving(false);
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const changeFormation = (newFormation: string) => {
+    const newLimits = { GK: 1, ...FORMATIONS[newFormation] };
+    // Remove players that exceed new limits
+    const counts: Record<string, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+    const kept: FantasyPlayer[] = [];
+    squad.forEach(p => {
+      if (counts[p.position] < (Number(newLimits[p.position as keyof typeof newLimits]) || 0)) {
+        kept.push(p);
+        counts[p.position]++;
+      }
+    });
+    setFormation(newFormation);
+    setSquad(kept);
+    persist(kept, newFormation);
+  };
+
   const addPlayer = (fp: FantasyPlayer) => {
     if (squad.length >= 11) return;
-    if (squad.filter(s => s.position === fp.position).length >= POSITION_LIMITS[fp.position]) return;
+    if (squad.filter(s => s.position === fp.position).length >= Number(POSITION_LIMITS[fp.position as keyof typeof POSITION_LIMITS] || 0)) return;
     if (squad.find(s => s.name === fp.name)) return;
     const next = [...squad, fp];
     setSquad(next);
@@ -171,9 +198,29 @@ export default function FantasySquadPicker({ player }: Props) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <div>
           <h2 style={{ fontSize: "17px", fontWeight: 700 }}>My Fantasy Squad</h2>
-          <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>1 GK · 4 DEF · 3 MID · 3 FWD</p>
+          <p style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+            1 GK · {FORMATIONS[formation].DEF} DEF · {FORMATIONS[formation].MID} MID · {FORMATIONS[formation].FWD} FWD
+          </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* Formation picker */}
+          <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {Object.keys(FORMATIONS).map(f => (
+              <button
+                key={f}
+                onClick={() => changeFormation(f)}
+                style={{
+                  fontSize: "11px", fontWeight: 700, padding: "3px 8px", borderRadius: "6px",
+                  border: `1.5px solid ${formation === f ? "var(--green)" : "var(--border)"}`,
+                  background: formation === f ? "var(--green)" : "var(--surface)",
+                  color: formation === f ? "white" : "var(--text-2)",
+                  cursor: "pointer",
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
           {saving && <span style={{ fontSize: "12px", color: "var(--text-3)" }}>Saving...</span>}
           {saved && <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 700 }}>✓ Saved</span>}
           <span style={{ fontWeight: 800, fontSize: "16px", color: squad.length === 11 ? "var(--green)" : "#f59e0b" }}>
@@ -191,7 +238,7 @@ export default function FantasySquadPicker({ player }: Props) {
       {/* SQUAD PITCH VIEW */}
       {activeTab === "squad" && (
         <div>
-          <PitchView squad={squad} onRemove={removePlayer} />
+          <PitchView squad={squad} onRemove={removePlayer} positionLimits={POSITION_LIMITS} />
           
           {squad.length === 0 && (
             <div style={{ textAlign: "center", marginTop: "16px" }}>
@@ -205,7 +252,7 @@ export default function FantasySquadPicker({ player }: Props) {
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {POSITIONS.map(pos => {
                   const have = counts[pos];
-                  const need = POSITION_LIMITS[pos];
+                  const need = POSITION_LIMITS[pos as keyof typeof POSITION_LIMITS] || 0;
                   const ok = have === need;
                   return (
                     <span key={pos} style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "12px", fontWeight: 700, background: ok ? POSITION_BG[pos] : "#fee2e2", color: ok ? POSITION_COLORS[pos] : "var(--red)", border: `1px solid ${ok ? POSITION_COLORS[pos] + "44" : "#fca5a5"}` }}>
@@ -233,7 +280,7 @@ export default function FantasySquadPicker({ player }: Props) {
           <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap" }}>
             {POSITIONS.map(pos => (
               <div key={pos} style={{ padding: "4px 10px", borderRadius: "99px", background: POSITION_BG[pos], color: POSITION_COLORS[pos], border: `1px solid ${POSITION_COLORS[pos]}44`, fontSize: "12px", fontWeight: 700 }}>
-                {pos}: {counts[pos]}/{POSITION_LIMITS[pos]}
+                {pos}: {counts[pos]}/{POSITION_LIMITS[pos as keyof typeof POSITION_LIMITS] || 0}
               </div>
             ))}
           </div>
@@ -255,7 +302,7 @@ export default function FantasySquadPicker({ player }: Props) {
           <div style={{ display: "grid", gap: "4px", maxHeight: "500px", overflowY: "auto" }}>
             {filtered.map(fp => {
               const inSquad = !!squad.find(s => s.name === fp.name);
-              const posFull = counts[fp.position] >= POSITION_LIMITS[fp.position];
+              const posFull = counts[fp.position] >= Number(POSITION_LIMITS[fp.position as keyof typeof POSITION_LIMITS] || 0);
               const squadFull = squad.length >= 11;
               const disabled = !inSquad && (posFull || squadFull);
 
