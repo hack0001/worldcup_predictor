@@ -101,7 +101,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
       </div>
 
       {/* Grid */}
-      <div style={{ height: "250px", overflowY: "auto" }}>
+      <div style={{ height: "280px", overflowY: "auto" }}>
         {loading && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: "13px" }}>Loading...</div>
         )}
@@ -125,7 +125,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
                 <img
                   src={previewUrl}
                   alt={gif.title || "GIF"}
-                  style={{ width: "100%", height: "78px", objectFit: "cover", display: "block" }}
+                  style={{ width: "100%", height: "auto", display: "block" }}
                   loading="lazy"
                 />
               </button>
