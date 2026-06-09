@@ -22,9 +22,11 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [pwError, setPwError] = useState("");
-  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form">("results");
+  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
+  const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
+  const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
@@ -55,6 +57,19 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
             map[row.player_id] = squad.map(p => p.name);
           });
           setUserFantasySquads(map);
+        }
+        // Load all leagues
+        const { data: leagueData } = await supabase.from("leagues").select("*").order("created_at");
+        if (leagueData) {
+          setAllLeagues(leagueData);
+          // Count players per league
+          const counts: Record<string, number> = {};
+          players.forEach(p => {
+            (p.leagueIds || []).forEach((id: string) => {
+              counts[id] = (counts[id] || 0) + 1;
+            });
+          });
+          setLeaguePlayerCounts(counts);
         }
       });
       getAllTeamForms().then(setTeamForms);
@@ -233,6 +248,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
         <button className={activeSection === "stats" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("stats")}>👕 Player Stats</button>
         <button className={activeSection === "form" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("form")}>📋 Team Form</button>
         <button className={activeSection === "users" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("users")}>👥 Users ({users.length})</button>
+        <button className={activeSection === "leagues" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("leagues")}>🏆 Leagues</button>
       </div>
 
       {activeSection === "results" && (
@@ -860,6 +876,61 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+      {activeSection === "leagues" && (
+        <div>
+          <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+            {allLeagues.length} league{allLeagues.length !== 1 ? "s" : ""} across all players.
+          </p>
+          <div style={{ display: "grid", gap: "10px" }}>
+            {allLeagues.map(league => {
+              const members = users.filter(u => (u.leagueIds || []).includes(league.id));
+              return (
+                <div key={league.id} className="card" style={{ padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "10px", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>⚽</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <p style={{ fontWeight: 700, fontSize: "15px" }}>{league.name}</p>
+                        <span style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", color: "var(--green)", background: "var(--green-light)", padding: "1px 7px", borderRadius: "4px" }}>{league.code}</span>
+                      </div>
+                      <p style={{ fontSize: "12px", color: "var(--text-3)", marginBottom: "8px" }}>
+                        {members.length} player{members.length !== 1 ? "s" : ""} · Created {new Date(league.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                      {members.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {members.map(u => (
+                            <span key={u.id} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "99px", background: "var(--surface2)", border: "1px solid var(--border)" }}>
+                              {u.name}
+                              {u.currentLeagueId === league.id && <span style={{ color: "var(--green)", marginLeft: "3px" }}>●</span>}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      className="btn-ghost"
+                      style={{ color: "var(--red)", fontSize: "12px", flexShrink: 0 }}
+                      onClick={async () => {
+                        if (!confirm(`Delete "${league.name}"? Players will lose access.`)) return;
+                        const { supabase } = await import("@/lib/supabase");
+                        await supabase.from("leagues").delete().eq("id", league.id);
+                        setAllLeagues(prev => prev.filter(l => l.id !== league.id));
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {allLeagues.length === 0 && (
+              <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)", fontSize: "13px" }}>
+                No leagues yet. Run the migration SQL to create the Original League.
+              </div>
+            )}
           </div>
         </div>
       )}
