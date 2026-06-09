@@ -443,15 +443,31 @@ export async function joinLeague(player: Player, leagueId: string): Promise<Play
   return updated;
 }
 
+const ORIGINAL_LEAGUE_ID = "aaaaaaaa-0000-0000-0000-000000000001";
+
+function dbToPlayerFull(d: Record<string, unknown>): Player {
+  return {
+    id: d.id as string, name: d.name as string, email: d.email as string,
+    teamName: d.team_name as string, topScorer: (d.top_scorer as string) || "",
+    topAssist: (d.top_assist as string) || "", avatarUrl: (d.avatar_url as string) || "",
+    status: (d.status as string) || "", tournamentWinner: (d.tournament_winner as string) || "",
+    playerOfTournament: (d.player_of_tournament as string) || "",
+    groupPredictions: (d.group_predictions as Player["groupPredictions"]) || {},
+    knockoutPredictions: (d.knockout_predictions as Player["knockoutPredictions"]) || {},
+    createdAt: d.created_at as string,
+    leagueIds: (d.league_ids as string[]) || [],
+    currentLeagueId: (d.current_league_id as string) || "",
+  };
+}
+
 export async function getPlayersInLeague(leagueId: string): Promise<Player[]> {
+  // Try contains query first
   const { data } = await supabase.from("players").select("*").contains("league_ids", [leagueId]);
-  return (data || []).map(d => ({
-    id: d.id, name: d.name, email: d.email, teamName: d.team_name,
-    topScorer: d.top_scorer || "", topAssist: d.top_assist || "",
-    avatarUrl: d.avatar_url || "", status: d.status || "",
-    leagueIds: d.league_ids || [], currentLeagueId: d.current_league_id || "",
-    tournamentWinner: d.tournament_winner || "", playerOfTournament: d.player_of_tournament || "",
-    groupPredictions: d.group_predictions || {}, knockoutPredictions: d.knockout_predictions || {},
-    createdAt: d.created_at,
-  }));
+  if (data && data.length > 0) return data.map(d => dbToPlayerFull(d as Record<string, unknown>));
+  // Fallback for original league: return all players (catches migration gaps)
+  if (leagueId === ORIGINAL_LEAGUE_ID) {
+    const { data: all } = await supabase.from("players").select("*");
+    return (all || []).map(d => dbToPlayerFull(d as Record<string, unknown>));
+  }
+  return [];
 }
