@@ -92,7 +92,10 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                     <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{player.teamName}</p>
                     {squad && (
                       <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
-                        {squad.squad.map(p => (
+                        {[...squad.squad].sort((a, b) => {
+                          const order: Record<string, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+                          return (order[a.position] ?? 4) - (order[b.position] ?? 4);
+                        }).map(p => (
                           <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[p.position] + "15", color: POSITION_COLORS[p.position], border: `1px solid ${POSITION_COLORS[p.position]}33`, borderRadius: "4px", padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
                             <FlagImg country={p.country} size={12} /> {p.name}
                           </span>
