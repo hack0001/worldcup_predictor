@@ -18,7 +18,7 @@ import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import FantasySquadPicker from "@/app/components/FantasySquad";
 import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
 import AdminPanel from "@/app/components/AdminPanel";
-import { getAllPlayerStats } from "@/lib/storage";
+import { getAllPlayerStats, getAllFantasySquads } from "@/lib/storage";
 
 type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch";
 type PredTab = "groups" | "knockout" | "board" | "standings" | "teams" | "chat" | "polls";
@@ -28,6 +28,7 @@ export default function App() {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [currentLeague, setCurrentLeague] = useState<League | null>(null);
   const [leaguePlayers, setLeaguePlayers] = useState<Player[]>([]);
+  const [fantasySquads, setFantasySquads] = useState<Awaited<ReturnType<typeof getAllFantasySquads>>>([]);
   const [adminState, setAdminState] = useState<AdminState>({
     isAdmin: false, results: { group: {}, knockout: {} },
     topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "",
@@ -76,6 +77,7 @@ export default function App() {
     getPlayersInLeague(currentLeague.id).then(setLeaguePlayers);
     getAdminState().then(s => setAdminState(s));
     getAllPlayerStats().then(setPlayerStats);
+    getAllFantasySquads().then(setFantasySquads);
   }, [currentLeague?.id]);
 
   const handlePlayerSaved = (p: Player) => {
@@ -248,7 +250,7 @@ export default function App() {
       </div>
       <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} />}
-        {fanTab === "board" && <FantasyLeaderboard players={leaguePlayers} squads={[]} stats={playerStats} currentPlayerId={currentPlayer.id} />}
+        {fanTab === "board" && <FantasyLeaderboard players={leaguePlayers} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}
       </div>
     </div>
   );
