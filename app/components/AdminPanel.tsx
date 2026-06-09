@@ -10,7 +10,7 @@ import FlagSelect from "./FlagSelect";
 interface Props {
   adminState: AdminState;
   onUpdate: (state: AdminState) => void;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 const ADMIN_PASSWORD = "worldcup2026";

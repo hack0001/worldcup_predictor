@@ -12,6 +12,7 @@ interface Props {
   currentPlayer: Player;
   allPlayers: Player[];
   isAdmin?: boolean;
+  leagueId?: string;
 }
 
 interface Poll {
@@ -33,7 +34,7 @@ function formatTime(iso: string) {
 
 const QUICK_REACTIONS = ["⚽", "🔥", "😂", "😬", "👏", "🤦", "💀", "🏆"];
 
-export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props) {
+export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [polls, setPolls] = useState<Record<string, Poll>>({});
   const [input, setInput] = useState("");
@@ -62,7 +63,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
 
   // Load messages + any referenced polls
   useEffect(() => {
-    getMessages(100).then(async msgs => {
+    getMessages(100, leagueId).then(async msgs => {
       setMessages(msgs);
       setLoading(false);
       // Load reactions for all messages
@@ -114,7 +115,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
     setInput("");
     setShowGif(false);
     setShowPoll(false);
-    await sendMessage(currentPlayer.id, trimmed || (gifUrl ? "GIF" : "📊 Poll"), gifUrl, pollId);
+    await sendMessage(currentPlayer.id, trimmed || (gifUrl ? "GIF" : "📊 Poll"), gifUrl, pollId, leagueId);
     setSending(false);
     inputRef.current?.focus();
   };
@@ -355,7 +356,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin }: Props)
       {/* Poll Creator */}
       {showPoll && (
         <div style={{ flexShrink: 0, padding: "0 12px 8px" }}>
-          <CreatePoll currentPlayer={currentPlayer} onCreated={handlePollCreated} onClose={() => setShowPoll(false)} />
+          <CreatePoll currentPlayer={currentPlayer} onCreated={handlePollCreated} onClose={() => setShowPoll(false)} leagueId={leagueId} />
         </div>
       )}
 

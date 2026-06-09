@@ -32,6 +32,8 @@ export async function savePlayer(player: Player): Promise<void> {
     team_name: player.teamName, top_scorer: player.topScorer, top_assist: player.topAssist,
     avatar_url: player.avatarUrl || "",
     status: player.status || "",
+    league_ids: player.leagueIds || [],
+    current_league_id: player.currentLeagueId || "",
     tournament_winner: player.tournamentWinner || "",
     player_of_tournament: player.playerOfTournament || "",
     group_predictions: player.groupPredictions,
@@ -46,6 +48,8 @@ function dbToPlayer(data: Record<string, unknown>): Player {
     topAssist: (data.top_assist as string) || "",
     avatarUrl: (data.avatar_url as string) || "",
     status: (data.status as string) || "",
+    leagueIds: (data.league_ids as string[]) || [],
+    currentLeagueId: (data.current_league_id as string) || "",
     tournamentWinner: (data.tournament_winner as string) || "",
     playerOfTournament: (data.player_of_tournament as string) || "",
     groupPredictions: (data.group_predictions as Player["groupPredictions"]) || {},
@@ -330,20 +334,18 @@ export interface Message {
   createdAt: string;
 }
 
-export async function getMessages(limit = 100): Promise<Message[]> {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+export async function getMessages(limit = 100, leagueId?: string): Promise<Message[]> {
+  let q = supabase.from("messages").select("*").order("created_at", { ascending: true }).limit(limit);
+  if (leagueId) q = q.eq("league_id", leagueId);
+  const { data } = await q;
   return (data || []).map(d => ({
     id: d.id, playerId: d.player_id, content: d.content,
     gifUrl: d.gif_url || "", pollId: d.poll_id || "", createdAt: d.created_at,
   }));
 }
 
-export async function sendMessage(playerId: string, content: string, gifUrl?: string, pollId?: string): Promise<void> {
-  const { error } = await supabase.from("messages").insert({ player_id: playerId, content, gif_url: gifUrl || "", poll_id: pollId || null });
+export async function sendMessage(playerId: string, content: string, gifUrl?: string, pollId?: string, leagueId?: string): Promise<void> {
+  const { error } = await supabase.from("messages").insert({ player_id: playerId, content, gif_url: gifUrl || "", poll_id: pollId || null, league_id: leagueId || "" });
   if (error) console.error("sendMessage error:", error.message);
 }
 
@@ -398,4 +400,58 @@ export function subscribeToReactions(callback: (r: Reaction, deleted: boolean) =
       callback({ messageId: d.message_id as string, playerId: d.player_id as string, emoji: d.emoji as string }, true);
     })
     .subscribe();
+}
+
+// ── Leagues ────────────────────────────────────────────────
+export interface League {
+  id: string;
+  name: string;
+  code: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export async function getLeague(id: string): Promise<League | null> {
+  const { data } = await supabase.from("leagues").select("*").eq("id", id).maybeSingle();
+  if (!data) return null;
+  return { id: data.id, name: data.name, code: data.code, createdBy: data.created_by, createdAt: data.created_at };
+}
+
+export async function getLeaguesByIds(ids: string[]): Promise<League[]> {
+  if (!ids.length) return [];
+  const { data } = await supabase.from("leagues").select("*").in("id", ids);
+  return (data || []).map(d => ({ id: d.id, name: d.name, code: d.code, createdBy: d.created_by, createdAt: d.created_at }));
+}
+
+export async function getLeagueByCode(code: string): Promise<League | null> {
+  const { data } = await supabase.from("leagues").select("*").eq("code", code.toUpperCase().trim()).maybeSingle();
+  if (!data) return null;
+  return { id: data.id, name: data.name, code: data.code, createdBy: data.created_by, createdAt: data.created_at };
+}
+
+export async function createLeague(name: string, createdBy: string): Promise<League | null> {
+  const code = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) + Math.floor(Math.random() * 1000);
+  const { data, error } = await supabase.from("leagues").insert({ name, code, created_by: createdBy }).select().single();
+  if (error || !data) return null;
+  return { id: data.id, name: data.name, code: data.code, createdBy: data.created_by, createdAt: data.created_at };
+}
+
+export async function joinLeague(player: Player, leagueId: string): Promise<Player> {
+  const newIds = [...new Set([...player.leagueIds, leagueId])];
+  const updated = { ...player, leagueIds: newIds, currentLeagueId: leagueId };
+  await savePlayer(updated);
+  return updated;
+}
+
+export async function getPlayersInLeague(leagueId: string): Promise<Player[]> {
+  const { data } = await supabase.from("players").select("*").contains("league_ids", [leagueId]);
+  return (data || []).map(d => ({
+    id: d.id, name: d.name, email: d.email, teamName: d.team_name,
+    topScorer: d.top_scorer || "", topAssist: d.top_assist || "",
+    avatarUrl: d.avatar_url || "", status: d.status || "",
+    leagueIds: d.league_ids || [], currentLeagueId: d.current_league_id || "",
+    tournamentWinner: d.tournament_winner || "", playerOfTournament: d.player_of_tournament || "",
+    groupPredictions: d.group_predictions || {}, knockoutPredictions: d.knockout_predictions || {},
+    createdAt: d.created_at,
+  }));
 }

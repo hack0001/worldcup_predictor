@@ -149,9 +149,10 @@ interface CreatePollProps {
   currentPlayer: Player;
   onCreated: (poll: Poll) => void;
   onClose: () => void;
+  leagueId?: string;
 }
 
-export function CreatePoll({ currentPlayer, onCreated, onClose }: CreatePollProps) {
+export function CreatePoll({ currentPlayer, onCreated, onClose, leagueId }: CreatePollProps) {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [saving, setSaving] = useState(false);
@@ -182,6 +183,7 @@ export function CreatePoll({ currentPlayer, onCreated, onClose }: CreatePollProp
       player_id: currentPlayer.id,
       question: q,
       options: opts,
+      league_id: leagueId || "",
     }).select().single();
 
     if (err || !data) { setError("Failed to create poll"); setSaving(false); return; }
@@ -250,15 +252,18 @@ export function CreatePoll({ currentPlayer, onCreated, onClose }: CreatePollProp
 interface PollFeedProps {
   currentPlayer: Player;
   allPlayers: Player[];
+  leagueId?: string;
 }
 
-export function PollFeed({ currentPlayer, allPlayers }: PollFeedProps) {
+export function PollFeed({ currentPlayer, allPlayers, leagueId }: PollFeedProps) {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    supabase.from("polls").select("*").order("created_at", { ascending: false }).limit(20).then(({ data }) => {
+    let q = supabase.from("polls").select("*").order("created_at", { ascending: false }).limit(20);
+    if (leagueId) q = q.eq("league_id", leagueId);
+    q.then(({ data }) => {
       setPolls((data || []).map(d => ({ id: d.id, playerId: d.player_id, question: d.question, options: d.options, createdAt: d.created_at })));
       setLoading(false);
     });
@@ -299,6 +304,7 @@ export function PollFeed({ currentPlayer, allPlayers }: PollFeedProps) {
             currentPlayer={currentPlayer}
             onCreated={poll => { setCreating(false); }}
             onClose={() => setCreating(false)}
+            leagueId={leagueId}
           />
         </div>
       )}

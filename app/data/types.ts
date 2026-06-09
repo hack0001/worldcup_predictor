@@ -38,6 +38,8 @@ export interface Player {
   topAssist: string;
   avatarUrl: string;
   status: string;
+  leagueIds: string[];
+  currentLeagueId: string;
   tournamentWinner: string;
   playerOfTournament: string;
   groupPredictions: Record<string, ScorePrediction>;

@@ -77,6 +77,8 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
       groupPredictions: existingPlayer?.groupPredictions || {},
       knockoutPredictions: existingPlayer?.knockoutPredictions || {},
       createdAt: existingPlayer?.createdAt || new Date().toISOString(),
+      leagueIds: existingPlayer?.leagueIds || [],
+      currentLeagueId: existingPlayer?.currentLeagueId || "",
     };
     await savePlayer(player);
     setCurrentUserId(player.id);
