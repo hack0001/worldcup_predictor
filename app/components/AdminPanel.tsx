@@ -13,15 +13,12 @@ interface Props {
   onClose?: () => void;
 }
 
-const ADMIN_PASSWORD = "worldcup2026";
 
 
 const ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter Finals", "Semi Finals", "Final"];
 
 export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
-  const [pwError, setPwError] = useState("");
+  const [authenticated] = useState(true); // Auth handled by page-level login
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
@@ -78,11 +75,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
     }
   }, [authenticated]);
 
-  const login = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) setAuthenticated(true);
-    else setPwError("Wrong password.");
-  };
 
   const updateGroupResult = (matchId: string, side: "home" | "away", value: string) => {
     const v = value.replace(/\D/g, "").slice(0, 2);
@@ -207,27 +199,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
     setStats(stats.filter(s => s.id !== id));
   };
 
-  if (!authenticated) {
-    return (
-      <div style={{ maxWidth: "360px" }}>
-        <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "20px" }}>🔐 Admin Access</h2>
-        <form onSubmit={login}>
-          <div style={{ display: "grid", gap: "12px" }}>
-            <div>
-              <label className="label">Password</label>
-              <input type="password" placeholder="Enter admin password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            {pwError && <p style={{ color: "var(--red)", fontSize: "13px" }}>{pwError}</p>}
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button className="btn-primary" type="submit">Enter</button>
-              <button className="btn-secondary" type="button" onClick={onClose}>Cancel</button>
-            </div>
-            <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Default: worldcup2026 — change in AdminPanel.tsx</p>
-          </div>
-        </form>
-      </div>
-    );
-  }
 
   const EMPTY_KO_RESULT = { homeTeam: "", awayTeam: "", homeScore: "", awayScore: "", wentToET: false, etHomeScore: "", etAwayScore: "", wentToPens: false, penWinner: "" };
   const knockoutRoundTabs: { id: "r32" | "r16" | "qf" | "sf" | "final"; label: string }[] = [

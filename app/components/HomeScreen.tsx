@@ -28,8 +28,8 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
         overflow: "hidden",
       }}>
         {/* Background decoration */}
-        <div style={{ position: "absolute", top: -20, right: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
-        <div style={{ position: "absolute", bottom: -30, left: -10, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
+        <div style={{ position: "absolute", top: -20, right: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.05)", overflow: "hidden" }} />
+        <div style={{ position: "absolute", bottom: -30, left: 0, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
 
         {/* Top row */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", position: "relative" }}>
@@ -51,7 +51,14 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
         {/* Tournament title */}
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            <span style={{ fontSize: "36px" }}>🏆</span>
+            <button onClick={onAdminClick} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 1, position: "relative" }}>
+              <span style={{ fontSize: "36px" }}>🏆</span>
+              {adminClickCount > 0 && (
+                <span style={{ position: "absolute", top: -4, right: -4, background: "rgba(255,255,255,0.9)", color: "#15803d", borderRadius: "99px", fontSize: "10px", fontWeight: 800, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {adminClickCount}
+                </span>
+              )}
+            </button>
             <div>
               <p style={{ fontWeight: 800, fontSize: "18px", color: "white", lineHeight: 1 }}>FIFA World Cup</p>
               <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>USA · Canada · Mexico 2026</p>
@@ -138,15 +145,6 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
 
         </div>
 
-        {/* Admin trigger */}
-        <div style={{ marginTop: "24px", textAlign: "center" }}>
-          <button
-            onClick={onAdminClick}
-            style={{ fontSize: "12px", color: adminClickCount > 0 ? "var(--green)" : "var(--text-3)", background: "none", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer", padding: "8px 16px", fontWeight: adminClickCount > 0 ? 700 : 400 }}
-          >
-            {adminClickCount > 0 ? `⚙️ ${5 - adminClickCount} more clicks for admin` : "⚙️ Admin"}
-          </button>
-        </div>
       </div>
     </div>
   );

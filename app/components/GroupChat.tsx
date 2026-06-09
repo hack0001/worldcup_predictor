@@ -247,7 +247,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
                   {isGif ? (
                     <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid var(--border)", cursor: "pointer" }}
                       onClick={() => window.open(msg.gifUrl, "_blank")}>
-                      <img src={msg.gifUrl} alt="GIF" style={{ display: "block", maxWidth: "240px", maxHeight: "200px", objectFit: "cover" }} loading="lazy" />
+                      <img src={msg.gifUrl} alt="GIF" style={{ display: "block", maxWidth: "min(240px, 65vw)", maxHeight: "200px", objectFit: "cover" }} loading="lazy" />
                     </div>
                   ) : (
                     <div style={{

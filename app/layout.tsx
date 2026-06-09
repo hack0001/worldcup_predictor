@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <div className="page-root">
+        <div className="page-root" style={{ overflowX: "hidden", width: "100%", maxWidth: "100vw" }}>
           {children}
         </div>
       </body>

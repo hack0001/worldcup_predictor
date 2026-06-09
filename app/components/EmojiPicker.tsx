@@ -42,7 +42,7 @@ export default function EmojiPicker({ onSelect, onClose }: Props) {
   const displayEmojis = filtered || EMOJI_DATA[activeCategory] || [];
 
   return (
-    <div className="card" style={{ padding: "10px", width: "280px", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+    <div className="card" style={{ padding: "10px", width: "min(280px, calc(100vw - 32px))", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
       {/* Header */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
         <input
