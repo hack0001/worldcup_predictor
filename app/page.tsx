@@ -134,43 +134,20 @@ export default function App() {
     </div>
   );
 
-  // No league yet — show selector with admin escape hatch
+  // No league yet — show selector
   if (!currentLeague || section === "leagueSwitch") return (
-    <div>
-      <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
-      {/* Admin access — small link at very bottom */}
-      <div style={{ position: "fixed", bottom: "12px", right: "12px" }}>
-        <button
-          onClick={handleAdminClick}
-          style={{ fontSize: "11px", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}
-        >
-          {adminClicks > 0 ? `${5 - adminClicks} more` : "⚙"}
-        </button>
-      </div>
-      {showAdmin && (
-        <div style={{ maxWidth: "700px", margin: "0 auto", padding: "0 16px 32px" }}>
-          <AdminPanel adminState={adminState} onUpdate={setAdminState} />
-        </div>
-      )}
-    </div>
+    <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
   );
 
   // Home
   if (section === "home") return (
-    <>
-      <HomeScreen
-        player={currentPlayer}
-        league={currentLeague}
-        onNav={navTo}
-        adminClickCount={adminClicks}
-        onAdminClick={handleAdminClick}
-      />
-      {showAdmin && (
-        <div style={{ maxWidth: "700px", margin: "0 auto", padding: "0 16px 32px" }}>
-          <AdminPanel adminState={adminState} onUpdate={setAdminState} />
-        </div>
-      )}
-    </>
+    <HomeScreen
+      player={currentPlayer}
+      league={currentLeague}
+      onNav={navTo}
+      adminClickCount={adminClicks}
+      onAdminClick={handleAdminClick}
+    />
   );
 
   const confirmedTeams = Object.fromEntries(

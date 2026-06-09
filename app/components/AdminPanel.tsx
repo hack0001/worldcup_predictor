@@ -27,6 +27,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
+  const [editingLeague, setEditingLeague] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [assigningLeague, setAssigningLeague] = useState<string | null>(null); // league id being assigned
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
@@ -882,47 +884,103 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
       {activeSection === "leagues" && (
         <div>
           <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
-            {allLeagues.length} league{allLeagues.length !== 1 ? "s" : ""} across all players.
+            {allLeagues.length} league{allLeagues.length !== 1 ? "s" : ""} · click Edit to rename or change code · Add Player to assign users manually.
           </p>
           <div style={{ display: "grid", gap: "10px" }}>
             {allLeagues.map(league => {
               const members = users.filter(u => (u.leagueIds || []).includes(league.id));
+              const nonMembers = users.filter(u => !(u.leagueIds || []).includes(league.id));
+              const isEditing = editingLeague?.id === league.id;
+              const isAssigning = assigningLeague === league.id;
               return (
                 <div key={league.id} className="card" style={{ padding: "14px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "10px", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>⚽</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                        <p style={{ fontWeight: 700, fontSize: "15px" }}>{league.name}</p>
-                        <span style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", color: "var(--green)", background: "var(--green-light)", padding: "1px 7px", borderRadius: "4px" }}>{league.code}</span>
+                  {isEditing ? (
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <div>
+                          <label className="label">League Name</label>
+                          <input value={editingLeague.name} onChange={e => setEditingLeague({ ...editingLeague, name: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="label">Join Code</label>
+                          <input value={editingLeague.code} onChange={e => setEditingLeague({ ...editingLeague, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) })} style={{ textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }} />
+                        </div>
                       </div>
-                      <p style={{ fontSize: "12px", color: "var(--text-3)", marginBottom: "8px" }}>
-                        {members.length} player{members.length !== 1 ? "s" : ""} · Created {new Date(league.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
-                      {members.length > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                          {members.map(u => (
-                            <span key={u.id} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "99px", background: "var(--surface2)", border: "1px solid var(--border)" }}>
-                              {u.name}
-                              {u.currentLeagueId === league.id && <span style={{ color: "var(--green)", marginLeft: "3px" }}>●</span>}
-                            </span>
-                          ))}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn-primary" style={{ fontSize: "12px" }} onClick={async () => {
+                          const { supabase } = await import("@/lib/supabase");
+                          await supabase.from("leagues").update({ name: editingLeague.name, code: editingLeague.code }).eq("id", league.id);
+                          setAllLeagues(prev => prev.map(l => l.id === league.id ? { ...l, name: editingLeague.name, code: editingLeague.code } : l));
+                          setEditingLeague(null);
+                        }}>Save</button>
+                        <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => setEditingLeague(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                        <div style={{ width: 40, height: 40, borderRadius: "10px", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>⚽</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                            <p style={{ fontWeight: 700, fontSize: "15px" }}>{league.name}</p>
+                            <span style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", color: "var(--green)", background: "var(--green-light)", padding: "1px 7px", borderRadius: "4px" }}>{league.code}</span>
+                          </div>
+                          <p style={{ fontSize: "12px", color: "var(--text-3)", marginBottom: "8px" }}>
+                            {members.length} player{members.length !== 1 ? "s" : ""} · Created {new Date(league.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                          {members.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                              {members.map(u => (
+                                <span key={u.id} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "99px", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                  {u.name}
+                                  {u.currentLeagueId === league.id && <span style={{ color: "var(--green)" }}>●</span>}
+                                  <button onClick={async () => {
+                                    if (!confirm(`Remove ${u.name} from ${league.name}?`)) return;
+                                    const { supabase } = await import("@/lib/supabase");
+                                    const newIds = (u.leagueIds || []).filter(id => id !== league.id);
+                                    await supabase.from("players").update({ league_ids: newIds }).eq("id", u.id);
+                                    setUsers(prev => prev.map(p => p.id === u.id ? { ...p, leagueIds: newIds } : p));
+                                  }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--red)", fontSize: "12px", padding: "0 2px", lineHeight: 1 }}>×</button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                          <button className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setEditingLeague({ id: league.id, name: league.name, code: league.code })}>Edit</button>
+                          <button className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setAssigningLeague(isAssigning ? null : league.id)}>+ Add Player</button>
+                          <button className="btn-ghost" style={{ color: "var(--red)", fontSize: "12px" }} onClick={async () => {
+                            if (!confirm(`Delete "${league.name}"? Players will lose access.`)) return;
+                            const { supabase } = await import("@/lib/supabase");
+                            await supabase.from("leagues").delete().eq("id", league.id);
+                            setAllLeagues(prev => prev.filter(l => l.id !== league.id));
+                          }}>Delete</button>
+                        </div>
+                      </div>
+                      {isAssigning && nonMembers.length > 0 && (
+                        <div style={{ marginTop: "10px", padding: "10px", background: "var(--bg)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                          <p style={{ fontSize: "12px", fontWeight: 600, marginBottom: "8px", color: "var(--text-2)" }}>Add player to {league.name}:</p>
+                          <div style={{ display: "grid", gap: "4px" }}>
+                            {nonMembers.map(u => (
+                              <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ flex: 1, fontSize: "13px" }}>{u.name}</span>
+                                <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{u.teamName}</span>
+                                <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px" }} onClick={async () => {
+                                  const { supabase } = await import("@/lib/supabase");
+                                  const newIds = [...new Set([...(u.leagueIds || []), league.id])];
+                                  await supabase.from("players").update({ league_ids: newIds }).eq("id", u.id);
+                                  setUsers(prev => prev.map(p => p.id === u.id ? { ...p, leagueIds: newIds } : p));
+                                }}>Add</button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
+                      {isAssigning && nonMembers.length === 0 && (
+                        <p style={{ fontSize: "12px", color: "var(--text-3)", marginTop: "8px" }}>All players are already in this league.</p>
+                      )}
                     </div>
-                    <button
-                      className="btn-ghost"
-                      style={{ color: "var(--red)", fontSize: "12px", flexShrink: 0 }}
-                      onClick={async () => {
-                        if (!confirm(`Delete "${league.name}"? Players will lose access.`)) return;
-                        const { supabase } = await import("@/lib/supabase");
-                        await supabase.from("leagues").delete().eq("id", league.id);
-                        setAllLeagues(prev => prev.filter(l => l.id !== league.id));
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  )}
                 </div>
               );
             })}
