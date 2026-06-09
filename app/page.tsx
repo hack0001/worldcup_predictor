@@ -212,7 +212,11 @@ export default function App() {
         </div>
       </div>
       <div style={{ padding: "16px 16px 32px" }}>
-        {predTab === "board" && <Leaderboard players={leaguePlayers} adminState={adminState} currentPlayerId={currentPlayer.id} />}
+        {predTab === "board" && <Leaderboard
+          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
+          adminState={adminState}
+          currentPlayerId={currentPlayer.id}
+        />}
         {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} />}
         {predTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} confirmedTeams={confirmedTeams} />}
         {predTab === "standings" && <GroupStandings adminState={adminState} />}
@@ -250,7 +254,12 @@ export default function App() {
       </div>
       <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} />}
-        {fanTab === "board" && <FantasyLeaderboard players={leaguePlayers} squads={fantasySquads} stats={playerStats} currentPlayerId={currentPlayer.id} />}
+        {fanTab === "board" && <FantasyLeaderboard
+          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
+          squads={fantasySquads}
+          stats={playerStats}
+          currentPlayerId={currentPlayer.id}
+        />}
       </div>
     </div>
   );

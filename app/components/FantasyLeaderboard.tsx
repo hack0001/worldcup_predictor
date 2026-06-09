@@ -28,6 +28,18 @@ const medals = ["🥇", "🥈", "🥉"];
 const podiumColors = ["#f59e0b", "#94a3b8", "#c97c47"];
 
 export default function FantasyLeaderboard({ players, squads, stats, currentPlayerId }: Props) {
+  const POS_ORDER: Record<string, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+
+  // Look up position from SQUADS data if not stored on the player
+  const getPosition = (name: string, storedPos?: string): string => {
+    if (storedPos && POS_ORDER[storedPos] !== undefined) return storedPos;
+    for (const { players: sp } of Object.values(SQUADS)) {
+      const found = sp.find((p: { name: string; position: string }) => p.name === name);
+      if (found) return found.position;
+    }
+    return "FWD";
+  };
+
   const ranked = players
     .map(p => {
       const squad = squads.find(s => s.playerId === p.id);
@@ -66,8 +78,8 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
       {ranked.length === 0 ? (
         <div className="card" style={{ padding: "48px", textAlign: "center" }}>
           <div style={{ fontSize: "40px", marginBottom: "12px" }}>👕</div>
-          <p style={{ fontWeight: 600 }}>No fantasy squads yet</p>
-          <p style={{ fontSize: "13px", color: "var(--text-2)" }}>Head to the Fantasy tab to pick your squad</p>
+          <p style={{ fontWeight: 600 }}>No players in this league yet</p>
+          <p style={{ fontSize: "13px", color: "var(--text-2)" }}>Players need to join this league to appear here</p>
         </div>
       ) : (
         <div style={{ display: "grid", gap: "8px" }}>
@@ -93,13 +105,15 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                     {squad && (
                       <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
                         {[...squad.squad].sort((a, b) => {
-                          const order: Record<string, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
-                          return (order[a.position] ?? 4) - (order[b.position] ?? 4);
-                        }).map(p => (
-                          <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[p.position] + "15", color: POSITION_COLORS[p.position], border: `1px solid ${POSITION_COLORS[p.position]}33`, borderRadius: "4px", padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                          return (POS_ORDER[getPosition(a.name, a.position)] ?? 4) - (POS_ORDER[getPosition(b.name, b.position)] ?? 4);
+                        }).map(p => {
+                          const pos = getPosition(p.name, p.position);
+                          return (
+                          <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[pos] + "15", color: POSITION_COLORS[pos], border: `1px solid ${POSITION_COLORS[pos]}33`, borderRadius: "4px", padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
                             <FlagImg country={p.country} size={12} /> {p.name}
                           </span>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     {!squad && <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>No squad picked yet</p>}
