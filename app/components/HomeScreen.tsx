@@ -32,32 +32,43 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
         <div style={{ position: "absolute", bottom: -30, left: -10, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
 
         {/* Top row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", position: "relative" }}>
-          <button onClick={() => onNav("profile")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-            <AvatarDisplay url={player.avatarUrl} name={player.name} size={44} />
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", position: "relative" }}>
+          <button onClick={() => onNav("profile")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+            <AvatarDisplay url={player.avatarUrl} name={player.name} size={56} />
           </button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 700, fontSize: "15px", color: "white" }}>{player.name}</p>
-            {player.status && <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>"{player.status}"</p>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 800, fontSize: "18px", color: "white", lineHeight: 1.2 }}>{player.name}</p>
+            {player.status
+              ? <p style={{ fontSize: "13px", color: "white", marginTop: "4px", background: "rgba(255,255,255,0.18)", display: "inline-block", padding: "2px 10px", borderRadius: "99px", fontStyle: "italic" }}>{player.status}</p>
+              : <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "3px" }}>Tap to add a status</p>
+            }
           </div>
-          <button onClick={() => onNav("profile")} style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "4px 10px", cursor: "pointer" }}>
-            Profile
+          <button onClick={() => onNav("profile")} style={{ fontSize: "12px", color: "white", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", flexShrink: 0, fontWeight: 600 }}>
+            Edit
           </button>
         </div>
 
         {/* Tournament title */}
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            {/* World Cup ball SVG */}
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="18" cy="18" r="17" fill="white" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
-              {/* Pentagon patches */}
-              <polygon points="18,4 22,10 18,14 14,10" fill="#111827"/>
-              <polygon points="29,12 31,18 26,20 22,16 24,10" fill="#111827"/>
-              <polygon points="28,26 24,30 20,26 22,20 27,20" fill="#111827"/>
-              <polygon points="16,30 12,28 12,22 17,20 20,26" fill="#111827"/>
-              <polygon points="7,24 5,18 10,14 14,18 12,24" fill="#111827"/>
-              <polygon points="12,10 8,14 5,10 10,6 14,8" fill="#111827"/>
+            {/* FIFA World Cup Trophy SVG */}
+            <svg width="38" height="44" viewBox="0 0 38 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Base plate */}
+              <rect x="8" y="40" width="22" height="4" rx="2" fill="rgba(255,255,255,0.9)"/>
+              <rect x="11" y="37" width="16" height="4" rx="1" fill="rgba(255,255,255,0.85)"/>
+              {/* Stem */}
+              <rect x="16" y="30" width="6" height="8" rx="2" fill="rgba(255,255,255,0.85)"/>
+              {/* Body of trophy */}
+              <path d="M9 6 C9 6 7 8 7 13 C7 20 12 25 19 27 C26 25 31 20 31 13 C31 8 29 6 29 6 Z" fill="rgba(255,255,255,0.95)"/>
+              {/* Handles */}
+              <path d="M9 8 C6 8 4 10 4 13 C4 16 6 17 9 17" stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+              <path d="M29 8 C32 8 34 10 34 13 C34 16 32 17 29 17" stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+              {/* Globe on top */}
+              <circle cx="19" cy="5" r="5" fill="rgba(255,255,255,0.95)"/>
+              <path d="M14 5 Q16 2 19 5 Q22 8 19 5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
+              <path d="M14 5 Q16 8 19 5 Q22 2 19 5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
+              <ellipse cx="19" cy="5" rx="2" ry="5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
+              <line x1="14" y1="5" x2="24" y2="5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8"/>
             </svg>
             <div>
               <p style={{ fontWeight: 800, fontSize: "18px", color: "white", lineHeight: 1 }}>FIFA World Cup</p>
@@ -149,9 +160,9 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
         <div style={{ marginTop: "24px", textAlign: "center" }}>
           <button
             onClick={onAdminClick}
-            style={{ fontSize: "11px", color: adminClickCount > 0 ? "var(--text-3)" : "transparent", background: "none", border: "none", cursor: adminClickCount > 0 ? "pointer" : "default", padding: "8px" }}
+            style={{ fontSize: "12px", color: adminClickCount > 0 ? "var(--green)" : "var(--text-3)", background: "none", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer", padding: "8px 16px", fontWeight: adminClickCount > 0 ? 700 : 400 }}
           >
-            {adminClickCount > 0 ? `⚙ ${5 - adminClickCount} more clicks for admin` : "·"}
+            {adminClickCount > 0 ? `⚙️ ${5 - adminClickCount} more clicks for admin` : "⚙️ Admin"}
           </button>
         </div>
       </div>
