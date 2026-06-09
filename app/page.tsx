@@ -47,15 +47,26 @@ export default function App() {
     if (saved) {
       try {
         const p = JSON.parse(saved) as Player;
-        setCurrentPlayer(p);
-        if (savedLeague) {
-          const l = JSON.parse(savedLeague) as League;
-          setCurrentLeague(l);
-          setSection("home");
-        }
-      } catch {}
+        // Always re-fetch from DB to get fresh leagueIds
+        import("@/lib/storage").then(({ getPlayerByEmail }) => {
+          getPlayerByEmail(p.email).then(fresh => {
+            const player = fresh || p;
+            setCurrentPlayer(player);
+            localStorage.setItem("wc26_player", JSON.stringify(player));
+            if (savedLeague) {
+              const l = JSON.parse(savedLeague) as League;
+              setCurrentLeague(l);
+              setSection("home");
+            }
+            setLoading(false);
+          });
+        });
+      } catch {
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Load league players + admin state when league changes
@@ -123,9 +134,25 @@ export default function App() {
     </div>
   );
 
-  // No league yet
+  // No league yet — show selector with admin escape hatch
   if (!currentLeague || section === "leagueSwitch") return (
-    <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
+    <div>
+      <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
+      {/* Admin access — small link at very bottom */}
+      <div style={{ position: "fixed", bottom: "12px", right: "12px" }}>
+        <button
+          onClick={handleAdminClick}
+          style={{ fontSize: "11px", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}
+        >
+          {adminClicks > 0 ? `${5 - adminClicks} more` : "⚙"}
+        </button>
+      </div>
+      {showAdmin && (
+        <div style={{ maxWidth: "700px", margin: "0 auto", padding: "0 16px 32px" }}>
+          <AdminPanel adminState={adminState} onUpdate={setAdminState} />
+        </div>
+      )}
+    </div>
   );
 
   // Home
