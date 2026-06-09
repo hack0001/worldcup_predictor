@@ -51,25 +51,7 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
         {/* Tournament title */}
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            {/* FIFA World Cup Trophy SVG */}
-            <svg width="38" height="44" viewBox="0 0 38 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Base plate */}
-              <rect x="8" y="40" width="22" height="4" rx="2" fill="rgba(255,255,255,0.9)"/>
-              <rect x="11" y="37" width="16" height="4" rx="1" fill="rgba(255,255,255,0.85)"/>
-              {/* Stem */}
-              <rect x="16" y="30" width="6" height="8" rx="2" fill="rgba(255,255,255,0.85)"/>
-              {/* Body of trophy */}
-              <path d="M9 6 C9 6 7 8 7 13 C7 20 12 25 19 27 C26 25 31 20 31 13 C31 8 29 6 29 6 Z" fill="rgba(255,255,255,0.95)"/>
-              {/* Handles */}
-              <path d="M9 8 C6 8 4 10 4 13 C4 16 6 17 9 17" stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-              <path d="M29 8 C32 8 34 10 34 13 C34 16 32 17 29 17" stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-              {/* Globe on top */}
-              <circle cx="19" cy="5" r="5" fill="rgba(255,255,255,0.95)"/>
-              <path d="M14 5 Q16 2 19 5 Q22 8 19 5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
-              <path d="M14 5 Q16 8 19 5 Q22 2 19 5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
-              <ellipse cx="19" cy="5" rx="2" ry="5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8" fill="none"/>
-              <line x1="14" y1="5" x2="24" y2="5" stroke="rgba(22,101,52,0.6)" strokeWidth="0.8"/>
-            </svg>
+            <span style={{ fontSize: "36px" }}>🏆</span>
             <div>
               <p style={{ fontWeight: 800, fontSize: "18px", color: "white", lineHeight: 1 }}>FIFA World Cup</p>
               <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>USA · Canada · Mexico 2026</p>

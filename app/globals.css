@@ -160,3 +160,152 @@ select option { background: white; }
   color: var(--text);
   margin-bottom: 12px;
 }
+
+/* ── Mobile & Responsive ─────────────────────────────── */
+
+/* Prevent iOS text size adjust on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  overflow-x: hidden;
+  /* Safe area padding for notched phones */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth scrolling everywhere */
+* {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Better tap targets on mobile - minimum 44px */
+button, .tab, input, select {
+  min-height: 44px;
+}
+
+/* Override for small inline badges/buttons */
+.badge, .btn-ghost {
+  min-height: unset;
+}
+
+/* Prevent double-tap zoom on buttons */
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Score inputs stay compact */
+.score-input {
+  min-height: unset !important;
+  height: 44px !important;
+}
+
+/* Horizontal scroll containers - hide scrollbar but keep functionality */
+.tab-bar, [style*="overflowX: auto"], [style*="overflow-x: auto"] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tab-bar::-webkit-scrollbar,
+[style*="overflowX: auto"]::-webkit-scrollbar {
+  display: none;
+}
+
+/* Cards get slightly more padding on larger screens */
+@media (min-width: 640px) {
+  .card {
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* Full-bleed on very small phones */
+@media (max-width: 360px) {
+  body {
+    font-size: 13px;
+  }
+  .btn-primary, .btn-secondary {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .tab {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
+
+/* Tablet and up - centre content with max-width */
+@media (min-width: 768px) {
+  body {
+    background: var(--bg);
+  }
+  /* Main content wrapper gets card-like appearance on tablet */
+  .page-root {
+    max-width: 700px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg);
+    box-shadow: 0 0 40px rgba(0,0,0,0.06);
+  }
+}
+
+/* Desktop - show a bit of background either side */
+@media (min-width: 1024px) {
+  body {
+    background: #e8ede8;
+  }
+}
+
+/* Fix iOS input zoom - inputs need 16px+ to prevent zoom */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  .score-input {
+    font-size: 18px !important;
+  }
+}
+
+/* Fix for fixed/sticky headers eating content */
+@media (max-width: 768px) {
+  /* Ensure content under sticky headers has enough space */
+  .section-content {
+    padding-bottom: 80px;
+  }
+}
+
+/* Pitch/grid areas scroll properly on mobile */
+@media (max-width: 500px) {
+  /* Fantasy pitch - allow horizontal scroll on very small screens */
+  .pitch-container {
+    overflow-x: auto;
+  }
+}
+
+/* Image and media */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Better focus rings on mobile (larger touch targets) */
+@media (hover: none) {
+  button:hover {
+    transform: none !important;
+  }
+  .btn-primary:hover {
+    background: var(--green);
+  }
+  .btn-secondary:hover {
+    border-color: var(--border-strong);
+    background: var(--surface);
+  }
+}
+
+/* GIF images in chat don't overflow */
+.chat-gif {
+  max-width: min(240px, 100%);
+}
