@@ -14,12 +14,13 @@ import GroupStandings from "@/app/components/GroupStandings";
 import TeamInfo from "@/app/components/TeamInfo";
 import GroupChat from "@/app/components/GroupChat";
 import { PollFeed } from "@/app/components/Poll";
+import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import FantasySquadPicker from "@/app/components/FantasySquad";
 import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
 import AdminPanel from "@/app/components/AdminPanel";
 import { getAllPlayerStats } from "@/lib/storage";
 
-type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "leagueSwitch";
+type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch";
 type PredTab = "groups" | "knockout" | "board" | "standings" | "teams" | "chat" | "polls";
 type FanTab = "squad" | "board";
 
@@ -92,13 +93,26 @@ export default function App() {
     setSection("home");
   };
 
+  const [adminPwInput, setAdminPwInput] = useState("");
+  const [adminPwError, setAdminPwError] = useState(false);
+
   const handleAdminClick = () => {
     const next = adminClicks + 1;
     setAdminClicks(next);
     if (next >= 5) {
-      const pw = prompt("Admin password:");
-      if (pw === "worldcup2026") { setShowAdmin(true); setSection("admin"); }
+      setSection("adminLogin");
       setAdminClicks(0);
+    }
+  };
+
+  const handleAdminLogin = () => {
+    if (adminPwInput === "worldcup2026") {
+      setShowAdmin(true);
+      setSection("admin");
+      setAdminPwInput("");
+      setAdminPwError(false);
+    } else {
+      setAdminPwError(true);
     }
   };
 
@@ -172,8 +186,30 @@ export default function App() {
   // Predictions section
   if (section === "predictions") return (
     <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      <NavBar back={() => setSection("home")} tabs={PRED_TABS} active={predTab} onTab={id => setPredTab(id as PredTab)} />
-      <div style={{ padding: "0 16px 32px" }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, #15803d 0%, #166534 100%)", padding: "16px 16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>⚽ Predictions</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{currentLeague.name}</p>
+          </div>
+          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
+        </div>
+        {/* Tabs inside header */}
+        <div style={{ display: "flex", gap: "2px", overflowX: "auto", paddingBottom: "0" }}>
+          {PRED_TABS.map(t => (
+            <button key={t.id} onClick={() => setPredTab(t.id as PredTab)} style={{
+              padding: "8px 12px", fontSize: "12px", fontWeight: predTab === t.id ? 800 : 500,
+              border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
+              background: predTab === t.id ? "var(--bg)" : "transparent",
+              color: predTab === t.id ? "var(--green)" : "rgba(255,255,255,0.7)",
+              borderBottom: predTab === t.id ? "3px solid var(--green)" : "3px solid transparent",
+            }}>{t.emoji} {t.label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: "16px 16px 32px" }}>
         {predTab === "board" && <Leaderboard players={leaguePlayers} adminState={adminState} currentPlayerId={currentPlayer.id} />}
         {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} />}
         {predTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} confirmedTeams={confirmedTeams} />}
@@ -188,8 +224,29 @@ export default function App() {
   // Fantasy section
   if (section === "fantasy") return (
     <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      <NavBar back={() => setSection("home")} tabs={FAN_TABS} active={fanTab} onTab={id => setFanTab(id as FanTab)} />
-      <div style={{ padding: "0 16px 32px" }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)", padding: "16px 16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>👕 Fantasy</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{currentLeague.name}</p>
+          </div>
+          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
+        </div>
+        <div style={{ display: "flex", gap: "2px", overflowX: "auto" }}>
+          {FAN_TABS.map(t => (
+            <button key={t.id} onClick={() => setFanTab(t.id as FanTab)} style={{
+              padding: "8px 16px", fontSize: "12px", fontWeight: fanTab === t.id ? 800 : 500,
+              border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
+              background: fanTab === t.id ? "var(--bg)" : "transparent",
+              color: fanTab === t.id ? "#3b82f6" : "rgba(255,255,255,0.7)",
+              borderBottom: fanTab === t.id ? "3px solid #3b82f6" : "3px solid transparent",
+            }}>{t.emoji} {t.label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} />}
         {fanTab === "board" && <FantasyLeaderboard players={leaguePlayers} squads={[]} stats={playerStats} currentPlayerId={currentPlayer.id} />}
       </div>
@@ -204,11 +261,46 @@ export default function App() {
     </div>
   );
 
+  // Admin login
+  if (section === "adminLogin") return (
+    <div style={{ maxWidth: "400px", margin: "80px auto", padding: "0 16px" }}>
+      <div className="card" style={{ padding: "28px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔐</div>
+        <h2 style={{ fontWeight: 800, fontSize: "18px", marginBottom: "6px" }}>Admin Access</h2>
+        <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "20px" }}>Enter the admin password to continue</p>
+        <input
+          type="password"
+          placeholder="Password"
+          value={adminPwInput}
+          onChange={e => { setAdminPwInput(e.target.value); setAdminPwError(false); }}
+          onKeyDown={e => e.key === "Enter" && handleAdminLogin()}
+          autoFocus
+          style={{ marginBottom: "8px", textAlign: "center", letterSpacing: "0.1em" }}
+        />
+        {adminPwError && <p style={{ fontSize: "12px", color: "var(--red)", marginBottom: "8px" }}>Incorrect password</p>}
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+          <button className="btn-primary" onClick={handleAdminLogin} style={{ flex: 1 }}>Enter</button>
+          <button className="btn-secondary" onClick={() => setSection("home")}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+
   // Admin
   if (section === "admin") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto", padding: "20px 16px" }}>
-      <button onClick={() => setSection("home")} className="btn-ghost" style={{ marginBottom: "16px", fontSize: "13px" }}>← Home</button>
-      <AdminPanel adminState={adminState} onUpdate={setAdminState} />
+    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+      <div style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)", padding: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>⚙️ Admin Panel</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>Manage the league</p>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "16px" }}>
+        <AdminPanel adminState={adminState} onUpdate={setAdminState} />
+      </div>
     </div>
   );
 

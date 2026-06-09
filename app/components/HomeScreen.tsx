@@ -47,11 +47,21 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
 
         {/* Tournament title */}
         <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-            <span style={{ fontSize: "22px" }}>🏆</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+            {/* World Cup ball SVG */}
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="18" cy="18" r="17" fill="white" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+              {/* Pentagon patches */}
+              <polygon points="18,4 22,10 18,14 14,10" fill="#111827"/>
+              <polygon points="29,12 31,18 26,20 22,16 24,10" fill="#111827"/>
+              <polygon points="28,26 24,30 20,26 22,20 27,20" fill="#111827"/>
+              <polygon points="16,30 12,28 12,22 17,20 20,26" fill="#111827"/>
+              <polygon points="7,24 5,18 10,14 14,18 12,24" fill="#111827"/>
+              <polygon points="12,10 8,14 5,10 10,6 14,8" fill="#111827"/>
+            </svg>
             <div>
-              <p style={{ fontWeight: 800, fontSize: "17px", color: "white", lineHeight: 1 }}>World Cup 2026</p>
-              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>USA · Canada · Mexico</p>
+              <p style={{ fontWeight: 800, fontSize: "18px", color: "white", lineHeight: 1 }}>FIFA World Cup</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>USA · Canada · Mexico 2026</p>
             </div>
           </div>
 
