@@ -920,6 +920,20 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                         <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                           <button className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setEditingLeague({ id: league.id, name: league.name, code: league.code })}>Edit</button>
                           <button className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setAssigningLeague(isAssigning ? null : league.id)}>+ Add Player</button>
+                          {nonMembers.length > 0 && (
+                            <button className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px", color: "var(--green)", borderColor: "var(--green)" }} onClick={async () => {
+                              if (!confirm(`Add all ${nonMembers.length} unassigned players to ${league.name}?`)) return;
+                              const { supabase } = await import("@/lib/supabase");
+                              for (const u of nonMembers) {
+                                const newIds = [...new Set([...(u.leagueIds || []), league.id])];
+                                await supabase.from("players").update({ league_ids: newIds }).eq("id", u.id);
+                              }
+                              setUsers(prev => prev.map(u => nonMembers.find(nm => nm.id === u.id)
+                                ? { ...u, leagueIds: [...new Set([...(u.leagueIds || []), league.id])] }
+                                : u
+                              ));
+                            }}>+ Add All ({nonMembers.length})</button>
+                          )}
                           <button className="btn-ghost" style={{ color: "var(--red)", fontSize: "12px" }} onClick={async () => {
                             if (!confirm(`Delete "${league.name}"? Players will lose access.`)) return;
                             const { supabase } = await import("@/lib/supabase");
