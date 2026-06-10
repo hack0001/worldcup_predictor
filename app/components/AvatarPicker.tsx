@@ -258,8 +258,8 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
       ) : (
         <>
           <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "14px" }}>
-            <button className={`tab ${tab === "upload" ? "active" : ""}`} onClick={() => setTab("upload")}>📷 Upload Photo</button>
-            <button className={`tab ${tab === "emoji" ? "active" : ""}`} onClick={() => setTab("emoji")}>😀 Pick Emoji</button>
+            <button type="button" className={`tab ${tab === "upload" ? "active" : ""}`} onClick={() => setTab("upload")}>📷 Upload Photo</button>
+            <button type="button" className={`tab ${tab === "emoji" ? "active" : ""}`} onClick={() => setTab("emoji")}>😀 Pick Emoji</button>
           </div>
 
           {tab === "upload" && (
