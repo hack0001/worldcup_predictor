@@ -239,7 +239,7 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
   };
 
   return (
-    <div>
+    <div style={{ width: "100%", maxWidth: "100%", overflow: "hidden", boxSizing: "border-box" }}>
       <label className="label">Profile Picture</label>
 
       {/* Preview */}
@@ -276,19 +276,19 @@ export default function AvatarPicker({ playerId, currentUrl, playerName, onUpdat
           )}
 
           {tab === "emoji" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: "6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "4px", width: "100%", boxSizing: "border-box" }}>
               {EMOJI_AVATARS.map(emoji => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => onUpdate(`emoji:${emoji}`)}
                   style={{
-                    fontSize: "24px", padding: "8px", lineHeight: 1,
+                    fontSize: "20px", padding: "6px 2px", lineHeight: 1,
                     border: "2px solid",
                     borderColor: emojiChar === emoji ? "var(--green)" : "var(--border)",
                     borderRadius: "8px",
                     background: emojiChar === emoji ? "var(--green-light)" : "var(--surface)",
-                    cursor: "pointer", transition: "all 0.15s",
+                    cursor: "pointer", width: "100%",
                   }}
                 >
                   {emoji}
