@@ -461,13 +461,6 @@ function dbToPlayerFull(d: Record<string, unknown>): Player {
 }
 
 export async function getPlayersInLeague(leagueId: string): Promise<Player[]> {
-  // Try contains query first
   const { data } = await supabase.from("players").select("*").contains("league_ids", [leagueId]);
-  if (data && data.length > 0) return data.map(d => dbToPlayerFull(d as Record<string, unknown>));
-  // Fallback for original league: return all players (catches migration gaps)
-  if (leagueId === ORIGINAL_LEAGUE_ID) {
-    const { data: all } = await supabase.from("players").select("*");
-    return (all || []).map(d => dbToPlayerFull(d as Record<string, unknown>));
-  }
-  return [];
+  return (data || []).map(d => dbToPlayerFull(d as Record<string, unknown>));
 }
