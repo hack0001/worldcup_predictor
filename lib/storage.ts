@@ -429,6 +429,11 @@ export async function getLeagueByCode(code: string): Promise<League | null> {
   return { id: data.id, name: data.name, code: data.code, createdBy: data.created_by, createdAt: data.created_at };
 }
 
+export async function getAllLeagues(): Promise<League[]> {
+  const { data } = await supabase.from("leagues").select("*").order("created_at", { ascending: true });
+  return (data || []).map(d => ({ id: d.id, name: d.name, code: d.code, createdBy: d.created_by, createdAt: d.created_at }));
+}
+
 export async function createLeague(name: string, createdBy: string): Promise<League | null> {
   const code = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) + Math.floor(Math.random() * 1000);
   const { data, error } = await supabase.from("leagues").insert({ name, code, created_by: createdBy }).select().single();
