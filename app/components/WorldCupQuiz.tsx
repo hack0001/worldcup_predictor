@@ -10,25 +10,27 @@ interface Question {
   options: string[];
   answer: number; // index of correct answer
   emoji: string;
-  trivia?: string; // fun fact shown after answering
+  trivia?: string;
+  imageUrl?: string; // optional image shown with question
+  resultImageUrl?: string; // optional image shown after answering (meme/reaction)
 }
 
 const QUESTIONS: Question[] = [
   { id: "q1", emoji: "🏆", question: "How many times has Brazil won the World Cup?", options: ["4", "5", "6", "3"], answer: 1, trivia: "Brazil are the only team to have played in every World Cup — 22 tournaments!" },
-  { id: "q2", emoji: "⚽", question: "Who scored the fastest goal in World Cup history?", options: ["Ronaldo", "Hakan Şükür", "Pelé", "Mbappe"], answer: 1, trivia: "Hakan Şükür scored after just 11 seconds for Turkey vs South Korea in 2002!" },
+  { id: "q2", emoji: "⚽", question: "Who scored the fastest goal in World Cup history?", options: ["Ronaldo", "Hakan Şükür", "Pelé", "Mbappe"], answer: 1, trivia: "Hakan Şükür scored after just 11 seconds for Turkey vs South Korea in 2002!", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Hakan_%C5%9E%C3%BCk%C3%BCr.jpg/220px-Hakan_%C5%9E%C3%BCk%C3%BCr.jpg" },
   { id: "q3", emoji: "🌍", question: "Which country is hosting the 2026 World Cup?", options: ["Brazil & Argentina", "USA, Canada & Mexico", "USA only", "Qatar & UAE"], answer: 1, trivia: "48 teams for the first time ever — up from 32!" },
-  { id: "q4", emoji: "🥅", question: "Who holds the record for most goals in World Cup history?", options: ["Ronaldo", "Messi", "Miroslav Klose", "Pelé"], answer: 2, trivia: "Miroslav Klose scored 16 goals across four World Cups for Germany." },
+  { id: "q4", emoji: "🥅", question: "Who holds the record for most goals in World Cup history?", options: ["Ronaldo", "Messi", "Miroslav Klose", "Pelé"], answer: 2, trivia: "Miroslav Klose scored 16 goals across four World Cups for Germany.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Miroslav_Klose_2014_%28cropped%29.jpg/200px-Miroslav_Klose_2014_%28cropped%29.jpg" },
   { id: "q5", emoji: "🎯", question: "Which goalkeeper famously saved a penalty with his face?", options: ["Peter Schmeichel", "Manuel Neuer", "René Higuita", "Tim Howard"], answer: 0, trivia: "Peter Schmeichel had an extraordinary career — he also scored 11 career goals!" },
   { id: "q6", emoji: "😂", question: "In 2002, which massive nation was knocked out by Senegal in the first round?", options: ["Brazil", "France", "Germany", "Italy"], answer: 1, trivia: "The reigning champions France went out in the group stage without scoring a single goal!" },
   { id: "q7", emoji: "🦁", question: "How many times has England won the World Cup?", options: ["Never", "Once — 1966", "Twice", "Three times"], answer: 1, trivia: "England won on home soil at Wembley, beating West Germany 4-2 after extra time." },
-  { id: "q8", emoji: "🐙", question: "Which unlikely 'psychic' animal correctly predicted 8/8 matches at the 2010 World Cup?", options: ["A parrot", "A dog", "Paul the Octopus", "A pig"], answer: 2, trivia: "Paul the Octopus achieved worldwide fame — even predicting Spain would beat the Netherlands in the final!" },
+  { id: "q8", emoji: "🐙", question: "Which unlikely 'psychic' animal correctly predicted 8/8 matches at the 2010 World Cup?", options: ["A parrot", "A dog", "Paul the Octopus", "A pig"], answer: 2, trivia: "Paul the Octopus achieved worldwide fame — even predicting Spain would beat the Netherlands in the final!", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Paul_the_Octopus_2010.jpg/220px-Paul_the_Octopus_2010.jpg" },
   { id: "q9", emoji: "📺", question: "The 2026 World Cup expands to how many teams?", options: ["32", "40", "48", "64"], answer: 2, trivia: "This means 104 matches in total — up from 64 in previous tournaments." },
-  { id: "q10", emoji: "👟", question: "Who won the Golden Boot at the 2018 World Cup?", options: ["Harry Kane", "Kylian Mbappé", "Antoine Griezmann", "Romelu Lukaku"], answer: 0, trivia: "Harry Kane scored 6 goals, including two hat-tricks. Four of those goals came from penalties." },
+  { id: "q10", emoji: "👟", question: "Who won the Golden Boot at the 2018 World Cup?", options: ["Harry Kane", "Kylian Mbappé", "Antoine Griezmann", "Romelu Lukaku"], answer: 0, trivia: "Harry Kane scored 6 goals, including two hat-tricks. Four of those goals came from penalties.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Harry_Kane_England_2022_%28cropped%29.jpg/200px-Harry_Kane_England_2022_%28cropped%29.jpg" },
   { id: "q11", emoji: "🎪", question: "Which city will host the 2026 World Cup Final?", options: ["New York / New Jersey", "Los Angeles", "Mexico City", "Toronto"], answer: 0, trivia: "MetLife Stadium in New Jersey will host the final — it holds over 82,000 fans." },
   { id: "q12", emoji: "😬", question: "Who missed the decisive penalty in England's Euro 2020 final shootout?", options: ["Marcus Rashford", "Bukayo Saka", "Jadon Sancho", "All three"], answer: 3, trivia: "Rashford, Sancho and Saka all missed. Saka was just 19 years old at the time." },
-  { id: "q13", emoji: "🌟", question: "How old was Pelé when he first won the World Cup?", options: ["21", "19", "17", "23"], answer: 2, trivia: "Pelé is still the youngest player to win a World Cup — he was 17 years and 249 days old in 1958." },
+  { id: "q13", emoji: "🌟", question: "How old was Pelé when he first won the World Cup?", options: ["21", "19", "17", "23"], answer: 2, trivia: "Pelé is still the youngest player to win a World Cup — he was 17 years and 249 days old in 1958.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Pel%C3%A9_1970.jpg/220px-Pel%C3%A9_1970.jpg" },
   { id: "q14", emoji: "🤔", question: "Which nation has won the most World Cups combined?", options: ["Brazil", "Germany", "Italy", "Brazil, Germany & Italy are tied"], answer: 0, trivia: "Brazil have 5, Germany 4, Italy 4. No other team has more than 3." },
-  { id: "q15", emoji: "🎭", question: "The infamous 'Hand of God' goal was scored by Maradona against which team?", options: ["Brazil", "England", "Germany", "Italy"], answer: 1, trivia: "Maradona scored twice that game — the cheating handball AND what many call the greatest goal ever." },
+  { id: "q15", emoji: "🎭", question: "The infamous 'Hand of God' goal was scored by Maradona against which team?", options: ["Brazil", "England", "Germany", "Italy"], answer: 1, trivia: "Maradona scored twice that game — the cheating handball AND what many call the greatest goal ever.", imageUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/b/b1/Maradona-goal-england.jpg/220px-Maradona-goal-england.jpg" },
   { id: "q16", emoji: "📊", question: "In 2026 how many group stage matches will there be in total?", options: ["48", "72", "96", "104"], answer: 1, trivia: "12 groups of 4 teams = 72 group matches. Then 32+16+8+4+2+1 = 32 knockout matches = 104 total." },
   { id: "q17", emoji: "🧊", question: "Iceland became the smallest nation to ever reach a World Cup when they qualified for which tournament?", options: ["2014", "2018", "2022", "2010"], answer: 1, trivia: "With a population of just 334,000 — smaller than most cities — Iceland reached the Round of 16 at Russia 2018." },
   { id: "q18", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", question: "Scotland are in the 2026 World Cup — when did they last qualify for a World Cup?", options: ["1994", "1998", "2002", "2006"], answer: 1, trivia: "Scotland last qualified for France 1998, where they were knocked out in the group stage." },
@@ -146,6 +148,13 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
           </div>
         </div>
 
+        {/* Question image */}
+        {q.imageUrl && (
+          <div style={{ marginBottom: "14px", borderRadius: "8px", overflow: "hidden", maxHeight: "180px", display: "flex", justifyContent: "center", background: "var(--surface2)" }}>
+            <img src={q.imageUrl} alt="" style={{ maxHeight: "180px", maxWidth: "100%", objectFit: "contain" }} loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          </div>
+        )}
+
         <div style={{ display: "grid", gap: "8px" }}>
           {q.options.map((option, i) => {
             const votes = qAnswers.filter(a => a.optionIndex === i).length;
@@ -182,6 +191,13 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
             );
           })}
         </div>
+
+        {/* Result image / meme */}
+        {hasAnswered && q.resultImageUrl && (
+          <div style={{ marginTop: "10px", borderRadius: "8px", overflow: "hidden" }}>
+            <img src={q.resultImageUrl} alt="" style={{ width: "100%", maxHeight: "160px", objectFit: "cover" }} loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          </div>
+        )}
 
         {/* Trivia reveal */}
         {hasAnswered && q.trivia && (
@@ -226,6 +242,52 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
           </p>
         </div>
       )}
+
+      {/* Quiz Leaderboard — show once at least one person has answered something */}
+      {(() => {
+        // Build per-player scores from all answers
+        const playerScores: Record<string, { name: string; playerId: string; correct: number; total: number }> = {};
+        Object.values(answers).flat().forEach(a => {
+          if (!playerScores[a.playerId]) playerScores[a.playerId] = { name: a.playerName, playerId: a.playerId, correct: 0, total: 0 };
+          playerScores[a.playerId].total++;
+          if (a.correct) playerScores[a.playerId].correct++;
+        });
+        const ranked = Object.values(playerScores).sort((a, b) => b.correct - a.correct || b.total - a.total);
+        if (!ranked.length) return null;
+        const medals = ["🥇", "🥈", "🥉"];
+        return (
+          <div style={{ marginTop: "20px" }}>
+            <p style={{ fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>📊 Quiz Leaderboard</p>
+            <div className="card" style={{ overflow: "hidden", padding: 0 }}>
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 60px 60px 60px", gap: "0", padding: "8px 14px", background: "var(--surface2)", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600 }}>#</span>
+                <span style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600 }}>Player</span>
+                <span style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600, textAlign: "center" }}>✅ Right</span>
+                <span style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600, textAlign: "center" }}>Answered</span>
+                <span style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600, textAlign: "center" }}>Score</span>
+              </div>
+              {ranked.map((p, idx) => {
+                const isMe = p.playerId === player.id;
+                const pct = Math.round((p.correct / 20) * 100);
+                const pp = playerMap[p.playerId];
+                return (
+                  <div key={p.playerId} style={{ display: "grid", gridTemplateColumns: "32px 1fr 60px 60px 60px", gap: "0", padding: "10px 14px", borderBottom: "1px solid var(--border)", background: isMe ? "var(--green-light)" : "transparent", alignItems: "center" }}>
+                    <span style={{ fontSize: "14px" }}>{medals[idx] || idx + 1}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
+                      <AvatarDisplay url={pp?.avatarUrl || ""} name={p.name} size={26} />
+                      <span style={{ fontSize: "13px", fontWeight: isMe ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{isMe && " (you)"}</span>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--green)", textAlign: "center" }}>{p.correct}</span>
+                    <span style={{ fontSize: "13px", color: "var(--text-2)", textAlign: "center" }}>{p.total}/20</span>
+                    <span style={{ fontSize: "13px", fontWeight: 600, textAlign: "center", color: pct >= 80 ? "var(--green)" : pct >= 50 ? "var(--text)" : "var(--red)" }}>{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
