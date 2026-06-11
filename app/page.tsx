@@ -162,6 +162,7 @@ export default function App() {
       player={currentPlayer}
       league={currentLeague}
       onNav={navTo}
+      onUpdate={updatePlayer}
       adminClickCount={adminClicks}
       onAdminClick={handleAdminClick}
     />

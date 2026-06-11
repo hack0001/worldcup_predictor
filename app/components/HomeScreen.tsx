@@ -1,13 +1,14 @@
-"use client";
+import { useState } from "react";
 import { Player } from "@/app/data/types";
-import { League } from "@/lib/storage";
+import { League, savePlayer } from "@/lib/storage";
 import { AvatarDisplay } from "./AvatarPicker";
 import { GROUP_MATCHES } from "@/app/data/worldcup";
 
 interface Props {
   player: Player;
   league: League;
-  onNav: (section: "predictions" | "fantasy" | "profile" | "leagueSwitch" | "admin") => void;
+  onNav: (section: "predictions" | "fantasy" | "profile" | "leagueSwitch" | "admin" | "quiz") => void;
+  onUpdate: (player: Player) => void;
   adminClickCount: number;
   onAdminClick: () => void;
 }
@@ -22,7 +23,22 @@ function parseKickoff(dateUK: string, timeUK: string): Date {
   } catch { return new Date(0); }
 }
 
-export default function HomeScreen({ player, league, onNav, adminClickCount, onAdminClick }: Props) {
+export default function HomeScreen({ player, league, onNav, onUpdate, adminClickCount, onAdminClick }: Props) {
+  const [localPreds, setLocalPreds] = useState<Record<string, { home: string; away: string }>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const savePred = async (matchId: string, home: string, away: string) => {
+    if (home === "" || away === "") return;
+    setSaving(matchId);
+    const updated = {
+      ...player,
+      groupPredictions: { ...player.groupPredictions, [matchId]: { home, away } },
+    };
+    await savePlayer(updated);
+    onUpdate(updated);
+    setLocalPreds(prev => { const n = { ...prev }; delete n[matchId]; return n; });
+    setSaving(null);
+  };
   const now = new Date();
   const tournamentStart = new Date("2026-06-11T00:00:00Z");
   const daysUntil = Math.max(0, Math.ceil((tournamentStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
@@ -107,7 +123,7 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
       {/* ── Main nav cards ── */}
       <div style={{ flex: 1, padding: "16px" }}>
         <div style={{ display: "grid", gap: "12px" }}>
-          {/* Upcoming fixtures */}
+          {/* Upcoming fixtures — inline predict */}
           {(() => {
             const now = new Date();
             const in72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
@@ -116,29 +132,55 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
               const pred = player.groupPredictions[m.id];
               const hasPred = pred?.home !== "" && pred?.home !== undefined && pred?.away !== "" && pred?.away !== undefined;
               return ko > now && ko <= in72h && !hasPred;
-            }).slice(0, 5);
+            }).slice(0, 6);
             if (!upcoming.length) return null;
             return (
               <div>
                 <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⏰ Predict before kickoff</p>
-                <div style={{ display: "grid", gap: "6px" }}>
+                <div style={{ display: "grid", gap: "8px" }}>
                   {upcoming.map(m => {
                     const home = typeof m.home === "string" ? m.home : m.home.team;
                     const away = typeof m.away === "string" ? m.away : m.away.team;
                     const ko = parseKickoff(m.dateUK, m.timeUK);
                     const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
-                    const timeLabel = diffH < 1 ? "< 1 hour" : diffH < 24 ? `${diffH}h` : `${m.dateUK} ${m.timeUK}`;
+                    const timeLabel = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : `${m.dateUK}`;
+                    const local = localPreds[m.id] || { home: "", away: "" };
+                    const isSaving = saving === m.id;
+                    const canSave = local.home !== "" && local.away !== "";
+
                     return (
-                      <button key={m.id} onClick={() => onNav("predictions")} className="card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", textAlign: "left", borderLeft: diffH < 3 ? "3px solid #ef4444" : "3px solid #f59e0b" }}>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 600, fontSize: "13px" }}>{home} <span style={{ color: "var(--text-3)", fontWeight: 400 }}>vs</span> {away}</p>
-                          <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "2px" }}>Group {m.group} · {m.city}</p>
+                      <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${diffH < 3 ? "#ef4444" : "#f59e0b"}` }}>
+                        {/* Time */}
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "11px", color: "var(--text-3)" }}>Group {m.group} · {m.city}</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#f59e0b" }}>{timeLabel} to go</span>
                         </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <p style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#f59e0b" }}>{timeLabel}</p>
-                          <p style={{ fontSize: "10px", color: "var(--text-3)" }}>Predict →</p>
+                        {/* Teams + score inputs */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, textAlign: "right" }}>{home}</span>
+                          <input
+                            type="text" inputMode="numeric" placeholder="–" maxLength={2}
+                            value={local.home}
+                            onChange={e => setLocalPreds(prev => ({ ...prev, [m.id]: { ...local, home: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }}
+                          />
+                          <span style={{ color: "var(--text-3)", fontWeight: 700 }}>–</span>
+                          <input
+                            type="text" inputMode="numeric" placeholder="–" maxLength={2}
+                            value={local.away}
+                            onChange={e => setLocalPreds(prev => ({ ...prev, [m.id]: { ...local, away: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }}
+                          />
+                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{away}</span>
+                          <button
+                            type="button" onClick={() => savePred(m.id, local.home, local.away)}
+                            disabled={!canSave || isSaving}
+                            style={{ padding: "6px 12px", borderRadius: "8px", border: "none", background: canSave ? "var(--green)" : "var(--border)", color: canSave ? "white" : "var(--text-3)", fontWeight: 700, fontSize: "12px", cursor: canSave ? "pointer" : "default", flexShrink: 0 }}
+                          >
+                            {isSaving ? "..." : "✓"}
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
