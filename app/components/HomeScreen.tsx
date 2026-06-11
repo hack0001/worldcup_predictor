@@ -2,6 +2,7 @@
 import { Player } from "@/app/data/types";
 import { League } from "@/lib/storage";
 import { AvatarDisplay } from "./AvatarPicker";
+import { GROUP_MATCHES } from "@/app/data/worldcup";
 
 interface Props {
   player: Player;
@@ -9,6 +10,16 @@ interface Props {
   onNav: (section: "predictions" | "fantasy" | "profile" | "leagueSwitch" | "admin") => void;
   adminClickCount: number;
   onAdminClick: () => void;
+}
+
+function parseKickoff(dateUK: string, timeUK: string): Date {
+  try {
+    const [day, mon] = dateUK.split(" ");
+    const [hh, mm] = timeUK.replace(/ BST| GMT/, "").split(":");
+    const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const isBST = timeUK.includes("BST");
+    return new Date(Date.UTC(2026, months[mon], Number(day), Number(hh) - (isBST ? 1 : 0), Number(mm)));
+  } catch { return new Date(0); }
 }
 
 export default function HomeScreen({ player, league, onNav, adminClickCount, onAdminClick }: Props) {
@@ -96,6 +107,44 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
       {/* ── Main nav cards ── */}
       <div style={{ flex: 1, padding: "16px" }}>
         <div style={{ display: "grid", gap: "12px" }}>
+          {/* Upcoming fixtures */}
+          {(() => {
+            const now = new Date();
+            const in72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+            const upcoming = GROUP_MATCHES.filter(m => {
+              const ko = parseKickoff(m.dateUK, m.timeUK);
+              const pred = player.groupPredictions[m.id];
+              const hasPred = pred?.home !== "" && pred?.home !== undefined && pred?.away !== "" && pred?.away !== undefined;
+              return ko > now && ko <= in72h && !hasPred;
+            }).slice(0, 5);
+            if (!upcoming.length) return null;
+            return (
+              <div>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⏰ Predict before kickoff</p>
+                <div style={{ display: "grid", gap: "6px" }}>
+                  {upcoming.map(m => {
+                    const home = typeof m.home === "string" ? m.home : m.home.team;
+                    const away = typeof m.away === "string" ? m.away : m.away.team;
+                    const ko = parseKickoff(m.dateUK, m.timeUK);
+                    const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
+                    const timeLabel = diffH < 1 ? "< 1 hour" : diffH < 24 ? `${diffH}h` : `${m.dateUK} ${m.timeUK}`;
+                    return (
+                      <button key={m.id} onClick={() => onNav("predictions")} className="card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", textAlign: "left", borderLeft: diffH < 3 ? "3px solid #ef4444" : "3px solid #f59e0b" }}>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600, fontSize: "13px" }}>{home} <span style={{ color: "var(--text-3)", fontWeight: 400 }}>vs</span> {away}</p>
+                          <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "2px" }}>Group {m.group} · {m.city}</p>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <p style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#f59e0b" }}>{timeLabel}</p>
+                          <p style={{ fontSize: "10px", color: "var(--text-3)" }}>Predict →</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Predictions */}
           <button
@@ -138,6 +187,21 @@ export default function HomeScreen({ player, league, onNav, adminClickCount, onA
                 <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>Fantasy</p>
                 <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Pick your World Cup XI</p>
                 <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", marginTop: "1px" }}>Squad · Fantasy Leaderboard</p>
+              </div>
+              <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
+            </div>
+          </button>
+
+          {/* Quiz */}
+          <button
+            onClick={() => onNav("quiz" as Parameters<typeof onNav>[0])}
+            style={{ padding: "0", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 14px rgba(124,58,237,0.3)", overflow: "hidden", textAlign: "left" }}
+          >
+            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
+              <div style={{ width: 52, height: 52, borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>🧠</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>World Cup Quiz</p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>20 questions · trivia · see what others said</p>
               </div>
               <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
             </div>
