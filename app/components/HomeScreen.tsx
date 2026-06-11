@@ -9,6 +9,7 @@ interface Props {
   league: League;
   onNav: (section: "predictions" | "fantasy" | "profile" | "leagueSwitch" | "admin" | "quiz") => void;
   onUpdate: (player: Player) => void;
+  onLogout: () => void;
   adminClickCount: number;
   onAdminClick: () => void;
 }
@@ -23,7 +24,7 @@ function parseKickoff(dateUK: string, timeUK: string): Date {
   } catch { return new Date(0); }
 }
 
-export default function HomeScreen({ player, league, onNav, onUpdate, adminClickCount, onAdminClick }: Props) {
+export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, adminClickCount, onAdminClick }: Props) {
   const [localPreds, setLocalPreds] = useState<Record<string, { home: string; away: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -70,9 +71,14 @@ export default function HomeScreen({ player, league, onNav, onUpdate, adminClick
               : <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "3px" }}>Tap to add a status</p>
             }
           </div>
-          <button onClick={() => onNav("profile")} style={{ fontSize: "12px", color: "white", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", flexShrink: 0, fontWeight: 600 }}>
-            Edit
-          </button>
+          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+            <button onClick={() => onNav("profile")} style={{ fontSize: "12px", color: "white", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontWeight: 600 }}>
+              Edit
+            </button>
+            <button onClick={onLogout} style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "6px 10px", cursor: "pointer" }} title="Log out">
+              ↩
+            </button>
+          </div>
         </div>
 
         {/* Tournament title */}

@@ -99,6 +99,16 @@ export default function App() {
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState(false);
 
+  const handleLogout = () => {
+    localStorage.removeItem("wc26_player");
+    localStorage.removeItem("wc26_league");
+    setCurrentPlayer(null);
+    setCurrentLeague(null);
+    setSection("home");
+    setShowAdmin(false);
+    setAdminClicks(0);
+  };
+
   const handleAdminClick = () => {
     const next = adminClicks + 1;
     setAdminClicks(next);
@@ -163,6 +173,7 @@ export default function App() {
       league={currentLeague}
       onNav={navTo}
       onUpdate={updatePlayer}
+      onLogout={handleLogout}
       adminClickCount={adminClicks}
       onAdminClick={handleAdminClick}
     />
@@ -288,7 +299,10 @@ export default function App() {
   // Profile
   if (section === "profile") return (
     <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
-      <button onClick={() => setSection("home")} className="btn-ghost" style={{ marginBottom: "16px", fontSize: "13px" }}>← Home</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <button onClick={() => setSection("home")} className="btn-ghost" style={{ fontSize: "13px" }}>← Home</button>
+        <button onClick={() => { if (confirm("Log out? You'll need your email to log back in.")) handleLogout(); }} className="btn-ghost" style={{ fontSize: "13px", color: "var(--red)" }}>Log out</button>
+      </div>
       <SignUp existingPlayer={currentPlayer} onComplete={p => { updatePlayer(p); setSection("home"); }} />
     </div>
   );
