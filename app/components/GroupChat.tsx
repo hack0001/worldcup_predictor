@@ -40,6 +40,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [readReceipts, setReadReceipts] = useState<Record<string, string[]>>({}); // messageId -> [playerId]
   const [showEmojiFor, setShowEmojiFor] = useState<string | null>(null); // messageId
   const [sending, setSending] = useState(false);
   const [showGif, setShowGif] = useState(false);
@@ -66,10 +67,25 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
     getMessages(100, leagueId).then(async msgs => {
       setMessages(msgs);
       setLoading(false);
-      // Load reactions for all messages
       const ids = msgs.map(m => m.id);
       getReactions(ids).then(setReactions);
-      // Load polls referenced in messages
+      // Load read receipts
+      if (ids.length > 0) {
+        const { data: rdata } = await supabase.from("message_reads").select("message_id, player_id").in("message_id", ids);
+        const rr: Record<string, string[]> = {};
+        (rdata || []).forEach((r: { message_id: string; player_id: string }) => {
+          if (!rr[r.message_id]) rr[r.message_id] = [];
+          rr[r.message_id].push(r.player_id);
+        });
+        setReadReceipts(rr);
+      }
+      // Mark latest as read
+      if (msgs.length > 0) {
+        const latest = msgs[msgs.length - 1];
+        await supabase.from("message_reads").upsert({ message_id: latest.id, player_id: currentPlayer.id }, { onConflict: "message_id,player_id" });
+        localStorage.setItem(`chat_read_${currentPlayer.id}`, latest.id);
+      }
+      // Load polls
       const pollIds = [...new Set(msgs.map(m => m.pollId).filter(Boolean))];
       if (pollIds.length > 0) {
         const { data } = await supabase.from("polls").select("*").in("id", pollIds as string[]);
@@ -84,6 +100,14 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
   useEffect(() => {
     const channel = subscribeToMessages(async msg => {
       setMessages(prev => [...prev, msg]);
+      // Auto-mark as read since chat is open
+      await supabase.from("message_reads").upsert({ message_id: msg.id, player_id: currentPlayer.id }, { onConflict: "message_id,player_id" });
+      localStorage.setItem(`chat_read_${currentPlayer.id}`, msg.id);
+      setReadReceipts(prev => {
+        const readers = prev[msg.id] || [];
+        if (!readers.includes(currentPlayer.id)) return { ...prev, [msg.id]: [...readers, currentPlayer.id] };
+        return prev;
+      });
       if (msg.pollId) {
         const { data } = await supabase.from("polls").select("*").eq("id", msg.pollId).single();
         if (data) setPolls(prev => ({ ...prev, [data.id]: { id: data.id, playerId: data.player_id, question: data.question, options: data.options, createdAt: data.created_at } }));
@@ -104,9 +128,10 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
   }, []);
 
   useLayoutEffect(() => {
+    if (loading) return;
     const container = messagesContainerRef.current;
     if (container) container.scrollTop = container.scrollHeight;
-  });
+  }, [loading, messages.length]);
 
   const send = async (content: string, gifUrl?: string, pollId?: string) => {
     const trimmed = content.trim();
@@ -177,7 +202,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, height: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -293,6 +318,20 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
                     {canDelete && (
                       <button onClick={() => handleDelete(msg.id)} style={{ fontSize: "10px", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>delete</button>
                     )}
+                    {/* Read receipts - show avatars of who has read */}
+                    {(() => {
+                      const readers = (readReceipts[msg.id] || []).filter(id => id !== currentPlayer.id);
+                      if (!readers.length) return null;
+                      return (
+                        <div style={{ display: "flex", gap: "2px", marginLeft: "auto" }}>
+                          {readers.slice(0, 5).map(id => {
+                            const p = playerMap[id];
+                            if (!p) return null;
+                            return <AvatarDisplay key={id} url={p.avatarUrl} name={p.name} size={14} />;
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

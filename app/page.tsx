@@ -19,6 +19,7 @@ import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import FantasySquadPicker from "@/app/components/FantasySquad";
 import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
 import AdminPanel from "@/app/components/AdminPanel";
+import { supabase } from "@/lib/supabase";
 import { getAllPlayerStats, getAllFantasySquads } from "@/lib/storage";
 
 type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz";
@@ -38,7 +39,21 @@ export default function App() {
   const [playerStats, setPlayerStats] = useState<Awaited<ReturnType<typeof getAllPlayerStats>>>([]);
   const [section, setSection] = useState<Section>("home");
   const [predTab, setPredTab] = useState<PredTab>("board");
+  const [unreadChat, setUnreadChat] = useState(false);
   const [fanTab, setFanTab] = useState<FanTab>("squad");
+
+  // Check for unread messages when not on chat tab
+  useEffect(() => {
+    if (section !== "predictions" || predTab === "chat") { setUnreadChat(false); return; }
+    const lastRead = localStorage.getItem(`chat_read_${currentPlayer?.id}`);
+    const checkUnread = async () => {
+      const { data } = await supabase.from("messages").select("id").order("created_at", { ascending: false }).limit(1);
+      if (data?.[0] && data[0].id !== lastRead) setUnreadChat(true);
+    };
+    checkUnread();
+    const interval = setInterval(checkUnread, 30000);
+    return () => clearInterval(interval);
+  }, [section, predTab, currentPlayer?.id]);
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdmin, setShowAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -214,13 +229,19 @@ export default function App() {
         {/* Tabs inside header */}
         <div style={{ display: "flex", gap: "2px", overflowX: "auto", paddingBottom: "0" }}>
           {PRED_TABS.map(t => (
-            <button key={t.id} onClick={() => setPredTab(t.id as PredTab)} style={{
+            <button key={t.id} onClick={() => { setPredTab(t.id as PredTab); if (t.id === "chat") setUnreadChat(false); }} style={{
               padding: "8px 12px", fontSize: "12px", fontWeight: predTab === t.id ? 800 : 500,
               border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
               background: predTab === t.id ? "var(--bg)" : "transparent",
               color: predTab === t.id ? "var(--green)" : "rgba(255,255,255,0.7)",
               borderBottom: predTab === t.id ? "3px solid var(--green)" : "3px solid transparent",
-            }}>{t.emoji} {t.label}</button>
+              position: "relative",
+            }}>
+              {t.emoji} {t.label}
+              {t.id === "chat" && unreadChat && (
+                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid white" }} />
+              )}
+            </button>
           ))}
         </div>
       </div>
