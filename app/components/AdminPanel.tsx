@@ -534,11 +534,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 </p>
                 <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Click any score to override it on behalf of this player.</p>
                 {Object.entries(GROUPS).map(([group, teams]) => {
-                  const groupMatches = GROUP_MATCHES.filter(m => {
-                    const h = typeof m.home === "string" ? m.home : (m.home as {team: string}).team;
-                    const a = typeof m.away === "string" ? m.away : (m.away as {team: string}).team;
-                    return (teams as unknown as string[]).includes(h) && (teams as unknown as string[]).includes(a);
-                  });
+                  const groupMatches = GROUP_MATCHES.filter(m => m.group === group);
                   return (
                     <div key={group} style={{ marginBottom: "10px" }}>
                       <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "5px" }}>GROUP {group}</p>
