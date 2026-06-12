@@ -653,9 +653,36 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           {/* Users list */}
           {!viewingUser && (
             <div>
-              <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
-                {users.length} player{users.length !== 1 ? "s" : ""} registered. Click View to see their predictions and fantasy squad.
-              </p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <p style={{ fontSize: "13px", color: "var(--text-2)" }}>
+                  {users.length} player{users.length !== 1 ? "s" : ""} registered.
+                </p>
+                <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
+                  if (!confirm("Auto-fill missing predictions for all players who haven't predicted matches kicking off within 3 hours? Uses 1-1 as default score.")) return;
+                  const now = new Date();
+                  const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+                  let filled = 0;
+                  for (const u of users) {
+                    const missing = GROUP_MATCHES.filter(m => {
+                      if (u.groupPredictions[m.id]) return false;
+                      const [day, mon] = m.dateUK.split(" ");
+                      const [hh, mm] = m.timeUK.replace(/ BST| GMT/,"").split(":");
+                      const isBST = m.timeUK.includes("BST");
+                      const ko = new Date(Date.UTC(2026, months[mon], Number(day), Number(hh)-(isBST?1:0), Number(mm)));
+                      const diffH = (ko.getTime() - now.getTime()) / 3600000;
+                      return diffH <= 3 && diffH > -120; // within 3h before or 2h after
+                    });
+                    if (!missing.length) continue;
+                    const newPreds = { ...u.groupPredictions };
+                    missing.forEach(m => { newPreds[m.id] = { home: "1", away: "1" }; });
+                    const updated = { ...u, groupPredictions: newPreds };
+                    await savePlayer(updated);
+                    setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
+                    filled += missing.length;
+                  }
+                  alert(`Auto-filled ${filled} missing prediction${filled !== 1 ? "s" : ""} with 1-1.`);
+                }}>⚡ Auto-fill missing</button>
+              </div>
 
               {/* Missing predictions alert */}
               {(() => {
