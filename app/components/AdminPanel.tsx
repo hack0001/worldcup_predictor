@@ -25,7 +25,9 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
   const [editingLeague, setEditingLeague] = useState<{ id: string; name: string; code: string } | null>(null);
-  const [assigningLeague, setAssigningLeague] = useState<string | null>(null); // league id being assigned
+  const [assigningLeague, setAssigningLeague] = useState<string | null>(null);
+  const [overridePreds, setOverridePreds] = useState<Record<string, { home: string; away: string }>>({});
+  const [savingOverride, setSavingOverride] = useState<string | null>(null); // league id being assigned
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
@@ -525,30 +527,62 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 </div>
               </div>
 
-              {/* Group predictions */}
+              {/* Group predictions - editable by admin */}
               <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>
                   ⚽ Group Predictions ({Object.keys(viewingUser.groupPredictions).length} of {GROUP_MATCHES.length} matches)
                 </p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Click any score to override it on behalf of this player.</p>
                 {Object.entries(GROUPS).map(([group, teams]) => {
-                  const groupMatches = GROUP_MATCHES.filter(m =>
-                    teams.includes(m.home) && teams.includes(m.away)
-                  );
-                  const hasPreds = groupMatches.some(m => viewingUser.groupPredictions[m.id]);
-                  if (!hasPreds) return null;
+                  const groupMatches = GROUP_MATCHES.filter(m => {
+                    const h = typeof m.home === "string" ? m.home : (m.home as {team: string}).team;
+                    const a = typeof m.away === "string" ? m.away : (m.away as {team: string}).team;
+                    return (teams as unknown as string[]).includes(h) && (teams as unknown as string[]).includes(a);
+                  });
                   return (
                     <div key={group} style={{ marginBottom: "10px" }}>
                       <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "5px" }}>GROUP {group}</p>
                       {groupMatches.map(m => {
                         const pred = viewingUser.groupPredictions[m.id];
-                        if (!pred) return null;
+                        const homeTeam = typeof m.home === "string" ? m.home : (m.home as {team: string}).team;
+                        const awayTeam = typeof m.away === "string" ? m.away : (m.away as {team: string}).team;
+                        const editing = overridePreds[m.id];
+                        const isSaving = savingOverride === m.id;
+                        const vals = editing || { home: pred?.home ?? "", away: pred?.away ?? "" };
                         return (
-                          <div key={m.id} style={{ display: "flex", gap: "8px", alignItems: "center", padding: "4px 0", fontSize: "12px", borderBottom: "1px solid var(--border)" }}>
-                            <span style={{ flex: 1, textAlign: "right" }}>{typeof m.home === "string" ? m.home : (m.home as {team: string}).team}</span>
-                            <span style={{ fontWeight: 800, color: "var(--green)", minWidth: "40px", textAlign: "center" }}>
-                              {pred.home ?? "?"} – {pred.away ?? "?"}
-                            </span>
-                            <span style={{ flex: 1 }}>{typeof m.away === "string" ? m.away : (m.away as {team: string}).team}</span>
+                          <div key={m.id} style={{ display: "flex", gap: "6px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
+                            <span style={{ flex: 1, textAlign: "right", fontSize: "12px" }}>{homeTeam}</span>
+                            <input
+                              type="text" inputMode="numeric" maxLength={2}
+                              value={vals.home}
+                              onChange={e => setOverridePreds(prev => ({ ...prev, [m.id]: { ...vals, home: e.target.value.replace(/[^0-9]/g,"") } }))}
+                              style={{ width: 36, textAlign: "center", fontWeight: 800, fontSize: "14px", padding: "3px 2px", border: editing ? "2px solid var(--green)" : "1px solid var(--border)", borderRadius: "4px" }}
+                              placeholder="–"
+                            />
+                            <span style={{ fontSize: "11px", color: "var(--text-3)" }}>–</span>
+                            <input
+                              type="text" inputMode="numeric" maxLength={2}
+                              value={vals.away}
+                              onChange={e => setOverridePreds(prev => ({ ...prev, [m.id]: { ...vals, away: e.target.value.replace(/[^0-9]/g,"") } }))}
+                              style={{ width: 36, textAlign: "center", fontWeight: 800, fontSize: "14px", padding: "3px 2px", border: editing ? "2px solid var(--green)" : "1px solid var(--border)", borderRadius: "4px" }}
+                              placeholder="–"
+                            />
+                            <span style={{ flex: 1, fontSize: "12px" }}>{awayTeam}</span>
+                            {editing && (
+                              <button
+                                onClick={async () => {
+                                  setSavingOverride(m.id);
+                                  const updated = { ...viewingUser, groupPredictions: { ...viewingUser.groupPredictions, [m.id]: { home: vals.home, away: vals.away } } };
+                                  await savePlayer(updated);
+                                  setViewingUser(updated);
+                                  setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+                                  setOverridePreds(prev => { const n = {...prev}; delete n[m.id]; return n; });
+                                  setSavingOverride(null);
+                                }}
+                                disabled={isSaving}
+                                style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "5px", border: "none", background: "var(--green)", color: "white", cursor: "pointer", flexShrink: 0, fontWeight: 700 }}
+                              >{isSaving ? "…" : "✓"}</button>
+                            )}
                           </div>
                         );
                       })}
@@ -556,7 +590,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   );
                 })}
                 {Object.keys(viewingUser.groupPredictions).length === 0 && (
-                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No group predictions yet</p>
+                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No group predictions yet — use the inputs above to add them.</p>
                 )}
               </div>
 
