@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
 import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
@@ -50,16 +50,6 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
   const inputRef = useRef<HTMLInputElement>(null);
   const initialScrollDone = useRef(false);
 
-  const scrollToBottom = (instant = false) => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    if (instant) {
-      container.scrollTop = container.scrollHeight;
-    } else {
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    }
-  };
-
   const playerMap = Object.fromEntries(allPlayers.map(p => [p.id, p]));
 
   // Load messages + any referenced polls
@@ -96,6 +86,16 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
     });
   }, []);
 
+  // Scroll to bottom - runs after every render when messages change
+  useEffect(() => {
+    if (!messagesEndRef.current) return;
+    // requestAnimationFrame ensures DOM is painted before we scroll
+    const id = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ block: "end" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [messages, loading]);
+
   // Subscribe to new messages
   useEffect(() => {
     const channel = subscribeToMessages(async msg => {
@@ -127,11 +127,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
     return () => { channel.unsubscribe(); };
   }, []);
 
-  useLayoutEffect(() => {
-    if (loading) return;
-    const container = messagesContainerRef.current;
-    if (container) container.scrollTop = container.scrollHeight;
-  }, [loading, messages.length]);
+
 
   const send = async (content: string, gifUrl?: string, pollId?: string) => {
     const trimmed = content.trim();
@@ -382,7 +378,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} style={{ height: 1, flexShrink: 0 }} />
       </div>
 
       {/* GIF Picker */}
