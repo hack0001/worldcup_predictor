@@ -4,6 +4,7 @@ import { Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
 import Flag from "./Flag";
+import { AvatarDisplay } from "./AvatarPicker";
 import { getAllTeamForms, TeamForm } from "@/lib/footballApi";
 
 const RESULT_COLORS: Record<string, string> = { W: "#16a34a", D: "#ca8a04", L: "#dc2626" };
@@ -181,28 +182,37 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
                         <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
-                        {/* Show everyone's predictions once locked */}
-                        {locked && allPlayers.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginLeft: "4px" }}>
-                            {allPlayers.filter(p => {
-                              const pr = p.groupPredictions?.[match.id];
-                              return pr?.home !== undefined && pr?.away !== undefined;
-                            }).map(p => {
-                              const pr = p.groupPredictions[match.id];
-                              const isMe = p.id === player.id;
-                              return (
-                                <div key={p.id} title={`${p.name}: ${pr.home}-${pr.away}`} style={{ display: "flex", alignItems: "center", gap: "2px", background: isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${isMe ? "var(--green)" : "var(--border)"}`, borderRadius: "4px", padding: "1px 5px", fontSize: "10px", fontWeight: 700, color: isMe ? "var(--green)" : "var(--text-2)" }}>
-                                  {pr.home}-{pr.away}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                       <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
                         <Flag country={match.away.team} /> {match.away.team}
                       </span>
                     </div>
+                    {/* Everyone's predictions below match row - mobile friendly */}
+                    {locked && allPlayers.length > 0 && (() => {
+                      const preds = allPlayers.filter(p => {
+                        const pr = p.groupPredictions?.[match.id];
+                        return pr?.home !== undefined && pr?.away !== undefined;
+                      });
+                      if (!preds.length) return null;
+                      return (
+                        <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--border)" }}>
+                          <p style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Predictions</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                            {preds.map(p => {
+                              const pr = p.groupPredictions[match.id];
+                              const isMe = p.id === player.id;
+                              return (
+                                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "8px", background: isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${isMe ? "var(--green)" : "var(--border)"}` }}>
+                                  <AvatarDisplay url={p.avatarUrl} name={p.name} size={20} />
+                                  <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name.split(" ")[0]}</span>
+                                  <span style={{ fontSize: "12px", fontWeight: 800, color: isMe ? "var(--green)" : "var(--text)", flexShrink: 0 }}>{pr.home}–{pr.away}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
