@@ -25,9 +25,10 @@ interface Props {
   player: Player;
   onUpdate: (player: Player) => void;
   readonly?: boolean;
+  allPlayers?: Player[];
 }
 
-export default function GroupPredictions({ player, onUpdate, readonly }: Props) {
+export default function GroupPredictions({ player, onUpdate, readonly, allPlayers = [] }: Props) {
   const [activeGroup, setActiveGroup] = useState("A");
   const [forms, setForms] = useState<Record<string, TeamForm>>({});
   const [now, setNow] = useState(() => new Date());
@@ -180,6 +181,23 @@ export default function GroupPredictions({ player, onUpdate, readonly }: Props) 
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
                         <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
+                        {/* Show everyone's predictions once locked */}
+                        {locked && allPlayers.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginLeft: "4px" }}>
+                            {allPlayers.filter(p => {
+                              const pr = p.groupPredictions?.[match.id];
+                              return pr?.home !== undefined && pr?.away !== undefined;
+                            }).map(p => {
+                              const pr = p.groupPredictions[match.id];
+                              const isMe = p.id === player.id;
+                              return (
+                                <div key={p.id} title={`${p.name}: ${pr.home}-${pr.away}`} style={{ display: "flex", alignItems: "center", gap: "2px", background: isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${isMe ? "var(--green)" : "var(--border)"}`, borderRadius: "4px", padding: "1px 5px", fontSize: "10px", fontWeight: 700, color: isMe ? "var(--green)" : "var(--text-2)" }}>
+                                  {pr.home}-{pr.away}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
                         <Flag country={match.away.team} /> {match.away.team}

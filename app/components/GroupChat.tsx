@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
 import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
@@ -86,15 +86,17 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
     });
   }, []);
 
-  // Scroll to bottom - runs after every render when messages change
+  // Scroll to bottom - use ref callback so it fires when element mounts
+  const endRefCallback = (node: HTMLDivElement | null) => {
+    (messagesEndRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    if (node) node.scrollIntoView({ block: "end" });
+  };
+
+  // Also scroll on new messages
   useEffect(() => {
-    if (!messagesEndRef.current) return;
-    // requestAnimationFrame ensures DOM is painted before we scroll
-    const id = requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ block: "end" });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [messages, loading]);
+    if (loading) return;
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length, loading]);
 
   // Subscribe to new messages
   useEffect(() => {
@@ -378,7 +380,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
             </div>
           );
         })}
-        <div ref={messagesEndRef} style={{ height: 1, flexShrink: 0 }} />
+        <div ref={endRefCallback} style={{ height: 1, flexShrink: 0 }} />
       </div>
 
       {/* GIF Picker */}

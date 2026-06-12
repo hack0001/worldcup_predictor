@@ -15,6 +15,7 @@ import TeamInfo from "@/app/components/TeamInfo";
 import GroupChat from "@/app/components/GroupChat";
 import { PollFeed } from "@/app/components/Poll";
 import WorldCupQuiz from "@/app/components/WorldCupQuiz";
+import FixturesView from "@/app/components/FixturesView";
 import { AvatarDisplay } from "@/app/components/AvatarPicker";
 import FantasySquadPicker from "@/app/components/FantasySquad";
 import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
@@ -22,7 +23,7 @@ import AdminPanel from "@/app/components/AdminPanel";
 import { supabase } from "@/lib/supabase";
 import { getAllPlayerStats, getAllFantasySquads } from "@/lib/storage";
 
-type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz";
+type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz" | "fixtures";
 type PredTab = "groups" | "knockout" | "board" | "standings" | "teams" | "chat" | "polls";
 type FanTab = "squad" | "board";
 
@@ -251,7 +252,7 @@ export default function App() {
           adminState={adminState}
           currentPlayerId={currentPlayer.id}
         />}
-        {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} />}
+        {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} allPlayers={leaguePlayers} />}
         {predTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} confirmedTeams={confirmedTeams} />}
         {predTab === "standings" && <GroupStandings adminState={adminState} />}
         {predTab === "teams" && <TeamInfo />}
@@ -294,6 +295,21 @@ export default function App() {
           stats={playerStats}
           currentPlayerId={currentPlayer.id}
         />}
+      </div>
+    </div>
+  );
+
+  // Fixtures
+  if (section === "fixtures") return (
+    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+      <div style={{ background: "linear-gradient(135deg, #0369a1, #0284c7)", padding: "16px 16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
+          <p style={{ fontWeight: 800, fontSize: "16px", color: "white", flex: 1 }}>📅 Upcoming Fixtures</p>
+        </div>
+      </div>
+      <div style={{ padding: "16px" }}>
+        <FixturesView player={currentPlayer} />
       </div>
     </div>
   );

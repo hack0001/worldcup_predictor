@@ -255,6 +255,21 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
             </div>
           </button>
 
+          {/* Fixtures */}
+          <button
+            onClick={() => onNav("fixtures" as Parameters<typeof onNav>[0])}
+            style={{ padding: "0", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(135deg, #0369a1, #0284c7)", boxShadow: "0 4px 14px rgba(3,105,161,0.3)", overflow: "hidden", textAlign: "left" }}
+          >
+            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
+              <div style={{ width: 52, height: 52, borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>📅</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>Fixtures</p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Next 96 hours · your predictions</p>
+              </div>
+              <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
+            </div>
+          </button>
+
         </div>
 
       </div>

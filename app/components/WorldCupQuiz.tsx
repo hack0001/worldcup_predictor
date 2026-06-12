@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
 import { supabase } from "@/lib/supabase";
 import { AvatarDisplay } from "./AvatarPicker";
@@ -57,6 +57,8 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [currentQ, setCurrentQ] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const playerMap = Object.fromEntries(allPlayers.map(p => [p.id, p]));
 
@@ -78,8 +80,9 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
   }, [player.id]);
 
   const submitAnswer = async (q: Question, optionIndex: number) => {
-    if (myAnswers[q.id] !== undefined) return; // already answered
-    const correct = optionIndex === q.answer;
+    if (myAnswers[q.id] !== undefined) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    const correct = optionIndex === q.answer; // -1 (timeout) is always wrong
     const answer: QuizAnswer = { questionId: q.id, playerId: player.id, playerName: player.name, optionIndex, correct };
 
     // Save to DB
@@ -95,6 +98,29 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
     });
     setRevealed(prev => ({ ...prev, [q.id]: true }));
   };
+
+  // Timer - counts down 30s per question, auto-submits on 0
+  useEffect(() => {
+    const q = QUESTIONS[currentQ];
+    if (myAnswers[q.id] !== undefined) { setTimeLeft(30); return; } // already answered
+    setTimeLeft(30);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          // Auto-submit wrong answer (mark as timed out) if not answered
+          const curr = QUESTIONS[currentQ];
+          if (myAnswers[curr.id] === undefined) {
+            submitAnswer(curr, -1); // -1 = timed out, no option chosen
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [currentQ, myAnswers]);
 
   const score = QUESTIONS.filter(q => myAnswers[q.id] === q.answer).length;
   const answered = Object.keys(myAnswers).length;
@@ -142,10 +168,32 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
       <div className="card" style={{ padding: "20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "16px" }}>
           <span style={{ fontSize: "28px", flexShrink: 0 }}>{q.emoji}</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px", fontWeight: 600 }}>QUESTION {currentQ + 1} OF 20</p>
             <p style={{ fontWeight: 700, fontSize: "15px", lineHeight: 1.4 }}>{q.question}</p>
           </div>
+          {/* Timer */}
+          {!hasAnswered && (
+            <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+              <svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" strokeWidth="3"/>
+                <circle cx="18" cy="18" r="15" fill="none"
+                  stroke={timeLeft <= 5 ? "#ef4444" : timeLeft <= 10 ? "#f59e0b" : "var(--green)"}
+                  strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={`${(timeLeft / 30) * 94.2} 94.2`}
+                  transform="rotate(-90 18 18)"
+                  style={{ transition: "stroke-dasharray 1s linear, stroke 0.3s" }}
+                />
+                <text x="18" y="22" textAnchor="middle" fontSize="11" fontWeight="700"
+                  fill={timeLeft <= 5 ? "#ef4444" : timeLeft <= 10 ? "#f59e0b" : "var(--text)"}>
+                  {timeLeft}
+                </text>
+              </svg>
+            </div>
+          )}
+          {hasAnswered && myAnswers[q.id] === -1 && (
+            <div style={{ flexShrink: 0, fontSize: "11px", color: "#ef4444", fontWeight: 700, textAlign: "center" }}>⏰<br/>Time!</div>
+          )}
         </div>
 
         {/* Question image */}
