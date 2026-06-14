@@ -334,21 +334,11 @@ export interface Message {
   createdAt: string;
 }
 
-export async function getMessages(limit = 50, leagueId?: string): Promise<Message[]> {
-  let q = supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(limit);
+export async function getMessages(limit = 100, leagueId?: string): Promise<Message[]> {
+  let q = supabase.from("messages").select("*").order("created_at", { ascending: true }).limit(limit);
   if (leagueId) q = q.eq("league_id", leagueId);
   const { data } = await q;
-  return (data || []).reverse().map(d => ({
-    id: d.id, playerId: d.player_id, content: d.content,
-    gifUrl: d.gif_url || "", pollId: d.poll_id || "", createdAt: d.created_at,
-  }));
-}
-
-export async function getOlderMessages(before: string, limit = 30, leagueId?: string): Promise<Message[]> {
-  let q = supabase.from("messages").select("*").order("created_at", { ascending: false }).lt("created_at", before).limit(limit);
-  if (leagueId) q = q.eq("league_id", leagueId);
-  const { data } = await q;
-  return (data || []).reverse().map(d => ({
+  return (data || []).map(d => ({
     id: d.id, playerId: d.player_id, content: d.content,
     gifUrl: d.gif_url || "", pollId: d.poll_id || "", createdAt: d.created_at,
   }));
