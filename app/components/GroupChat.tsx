@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
-import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
+import { Message, getMessages, getOlderMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { AvatarDisplay } from "./AvatarPicker";
 import GifPicker from "./GifPicker";
@@ -45,6 +45,8 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
   const [sending, setSending] = useState(false);
   const [showGif, setShowGif] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,14 +54,15 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
 
   const playerMap = Object.fromEntries(allPlayers.map(p => [p.id, p]));
 
-  // Load messages + any referenced polls
+  // Load 50 most recent messages first, scroll to bottom once
   useEffect(() => {
-    getMessages(100, leagueId).then(async msgs => {
+    initialScrollDone.current = false;
+    getMessages(50, leagueId).then(async msgs => {
       setMessages(msgs);
+      setHasMore(msgs.length === 50);
       setLoading(false);
       const ids = msgs.map(m => m.id);
       getReactions(ids).then(setReactions);
-      // Load read receipts
       if (ids.length > 0) {
         const { data: rdata } = await supabase.from("message_reads").select("message_id, player_id").in("message_id", ids);
         const rr: Record<string, string[]> = {};
@@ -69,13 +72,11 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
         });
         setReadReceipts(rr);
       }
-      // Mark latest as read
       if (msgs.length > 0) {
         const latest = msgs[msgs.length - 1];
         await supabase.from("message_reads").upsert({ message_id: latest.id, player_id: currentPlayer.id }, { onConflict: "message_id,player_id" });
         localStorage.setItem(`chat_read_${currentPlayer.id}`, latest.id);
       }
-      // Load polls
       const pollIds = [...new Set(msgs.map(m => m.pollId).filter(Boolean))];
       if (pollIds.length > 0) {
         const { data } = await supabase.from("polls").select("*").in("id", pollIds as string[]);
@@ -84,19 +85,45 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
         setPolls(pollMap);
       }
     });
-  }, []);
+  }, [leagueId]);
 
-  // Scroll to bottom - use ref callback so it fires when element mounts
-  const endRefCallback = (node: HTMLDivElement | null) => {
-    (messagesEndRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-    if (node) node.scrollIntoView({ block: "end" });
+  // Load older messages when user scrolls to top
+  const handleScroll = async () => {
+    const container = messagesContainerRef.current;
+    if (!container || loadingMore || !hasMore) return;
+    if (container.scrollTop > 60) return; // only near top
+    const oldest = messages[0];
+    if (!oldest) return;
+    setLoadingMore(true);
+    const older = await getOlderMessages(oldest.createdAt, 30, leagueId);
+    if (older.length === 0) { setHasMore(false); setLoadingMore(false); return; }
+    // Preserve scroll position
+    const prevHeight = container.scrollHeight;
+    setMessages(prev => [...older, ...prev]);
+    setHasMore(older.length === 30);
+    setLoadingMore(false);
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight - prevHeight;
+    });
   };
 
-  // Also scroll on new messages
+  // Scroll to bottom only on initial load and new outgoing messages
+  const endRefCallback = (node: HTMLDivElement | null) => {
+    (messagesEndRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    if (node && !initialScrollDone.current) {
+      node.scrollIntoView({ block: "end" });
+      initialScrollDone.current = true;
+    }
+  };
+
+  // Scroll on new incoming messages (only if near bottom)
   useEffect(() => {
     if (loading) return;
-    messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, loading]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    if (nearBottom) messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   // Subscribe to new messages
   useEffect(() => {
@@ -200,7 +227,9 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+        {loadingMore && <div style={{ textAlign: "center", padding: "8px", fontSize: "12px", color: "var(--text-3)" }}>Loading older messages...</div>}
+        {!hasMore && messages.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: "11px", color: "var(--text-3)" }}>— start of conversation —</div>}
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
