@@ -547,36 +547,42 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
 
                   const extractName = (raw: string) => NAME_MAP[raw] || raw;
 
-                  const processApiList = (data: {response?: {player:{name:string;nationality:string};statistics:{games:{minutes:number|null};goals:{total:number|null;assists:number|null};cards:{yellow:number;red:number}}[]}[]}, field: "goals"|"assists"|"cards") => {
+                  // Process each API list - always take max values, never overwrite with lower
+                  const processApiList = (data: {response?: {player:{name:string;nationality:string};statistics:{games:{minutes:number|null};goals:{total:number|null;assists:number|null};cards:{yellow:number;red:number}}[]}[]}) => {
                     for (const item of data?.response || []) {
                       const name = extractName(item.player.name);
                       const st = item.statistics[0];
                       if (!playerMap[name]) playerMap[name] = { goals:0, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:item.player.nationality, apiName:item.player.name };
-                      playerMap[name].minutesPlayed = st.games.minutes||0;
-                      if (field==="goals") { playerMap[name].goals=st.goals.total||0; playerMap[name].assists=st.goals.assists||0; }
-                      if (field==="assists") { if(!playerMap[name].assists) playerMap[name].assists=st.goals.assists||0; }
-                      if (field==="cards") { playerMap[name].yellowCards=st.cards.yellow||0; playerMap[name].redCards=st.cards.red||0; }
+                      const p = playerMap[name];
+                      p.minutesPlayed = Math.max(p.minutesPlayed, st.games.minutes||0);
+                      p.goals = Math.max(p.goals, st.goals.total||0);
+                      p.assists = Math.max(p.assists, st.goals.assists||0);
+                      p.yellowCards = Math.max(p.yellowCards, st.cards.yellow||0);
+                      p.redCards = Math.max(p.redCards, st.cards.red||0);
                     }
                   };
 
-                  processApiList(gData, "goals");
-                  processApiList(aData, "assists");
-                  processApiList(yData, "cards");
+                  processApiList(gData);
+                  processApiList(aData);
+                  processApiList(yData);
 
-                  // Also add openfootball-only scorers not in API response
+                  // Add openfootball scorers as fallback for anyone missing from API
                   for (const [name, g] of Object.entries(ofGoals)) {
                     if (!playerMap[name]) {
                       const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(p=>p.name===name));
                       playerMap[name] = { goals:g, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:squadInfo?.[0]||"Unknown", apiName:name };
+                    } else {
+                      playerMap[name].goals = Math.max(playerMap[name].goals, g);
                     }
                   }
 
+                  // Build results - ONLY show players in fantasy squads
                   const results = Object.entries(playerMap).map(([name, p]) => {
                     const inSquad = squadSet.has(name);
                     const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(pl=>pl.name===name));
                     return { name, country: squadInfo?.[0]||p.country, goals:p.goals, assists:p.assists, yellowCards:p.yellowCards, redCards:p.redCards, minutesPlayed:p.minutesPlayed, approved:inSquad&&!!squadInfo, noMatch:!squadInfo };
-                  }).filter(p => p.goals>0||p.assists>0||p.yellowCards>0)
-                    .sort((a,b) => b.goals-a.goals||b.assists-a.assists);
+                  }).filter(p => squadSet.has(p.name)) // ONLY squad picks
+                    .sort((a,b) => b.goals-a.goals||b.assists-a.assists||b.yellowCards-a.yellowCards);
 
                   setFetchedStats(results);
                 } catch(e) { alert("Failed to fetch. Check console."); console.error(e); }
@@ -992,6 +998,15 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                         <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                           <button className="btn-primary" onClick={() => setViewingUser(u)} style={{ fontSize: "12px", padding: "5px 12px" }}>View</button>
                           <button className="btn-secondary" onClick={() => setEditingUser(u)} style={{ fontSize: "12px", padding: "5px 10px" }}>Edit</button>
+                          <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 10px" }} title="Auto-fill missing predictions with random 1-1/2-1/1-2" onClick={async () => {
+                            if (!confirm(`Auto-fill ALL missing predictions for ${u.name} with random scores (1-1, 2-1, or 1-2)?`)) return;
+                            const scores = [["1","1"],["2","1"],["1","2"]];
+                            const newPreds = { ...u.groupPredictions };
+                            GROUP_MATCHES.forEach(m => { if (!newPreds[m.id]) { const s = scores[Math.floor(Math.random()*3)]; newPreds[m.id] = { home: s[0], away: s[1] }; } });
+                            const updated = { ...u, groupPredictions: newPreds };
+                            await savePlayer(updated);
+                            setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
+                          }}>⚡ Fill</button>
                           <button
                             className="btn-ghost"
                             style={{ color: "var(--red)", fontSize: "12px" }}
