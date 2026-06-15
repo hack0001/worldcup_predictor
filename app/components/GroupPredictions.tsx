@@ -27,9 +27,10 @@ interface Props {
   onUpdate: (player: Player) => void;
   readonly?: boolean;
   allPlayers?: Player[];
+  adminState?: { results: { group: Record<string, { home: string; away: string }> } };
 }
 
-export default function GroupPredictions({ player, onUpdate, readonly, allPlayers = [] }: Props) {
+export default function GroupPredictions({ player, onUpdate, readonly, allPlayers = [], adminState }: Props) {
   const [activeGroup, setActiveGroup] = useState("A");
   const [forms, setForms] = useState<Record<string, TeamForm>>({});
   const [now, setNow] = useState(() => new Date());
@@ -189,27 +190,43 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                     </div>
                     {/* Everyone's predictions below match row - mobile friendly */}
                     {locked && allPlayers.length > 0 && (() => {
+                      const result = adminState?.results?.group?.[match.id];
                       const preds = allPlayers.filter(p => {
                         const pr = p.groupPredictions?.[match.id];
                         return pr?.home !== undefined && pr?.away !== undefined;
                       });
-                      if (!preds.length) return null;
+                      if (!preds.length && !result) return null;
                       return (
                         <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--border)" }}>
-                          <p style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Predictions</p>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
-                            {preds.map(p => {
-                              const pr = p.groupPredictions[match.id];
-                              const isMe = p.id === player.id;
-                              return (
-                                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "8px", background: isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${isMe ? "var(--green)" : "var(--border)"}` }}>
-                                  <AvatarDisplay url={p.avatarUrl} name={p.name} size={20} />
-                                  <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name.split(" ")[0]}</span>
-                                  <span style={{ fontSize: "12px", fontWeight: 800, color: isMe ? "var(--green)" : "var(--text)", flexShrink: 0 }}>{pr.home}–{pr.away}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          {/* Actual score */}
+                          {result && (
+                            <div style={{ textAlign: "center", marginBottom: "8px", padding: "6px", background: "#fef9c3", borderRadius: "8px", border: "1px solid #fde047" }}>
+                              <p style={{ fontSize: "10px", fontWeight: 700, color: "#854d0e", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Final Score</p>
+                              <p style={{ fontSize: "20px", fontWeight: 900, color: "#713f12" }}>{result.home} – {result.away}</p>
+                            </div>
+                          )}
+                          {preds.length > 0 && (
+                            <>
+                              <p style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Predictions</p>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                                {preds.map(p => {
+                                  const pr = p.groupPredictions[match.id];
+                                  const isMe = p.id === player.id;
+                                  const correct = result && pr.home === result.home && pr.away === result.away;
+                                  const correctResult = result && ((Number(pr.home) > Number(pr.away)) === (Number(result.home) > Number(result.away)) || (pr.home === pr.away && result.home === result.away));
+                                  const indicator = correct ? "✅" : result ? (correctResult ? "🟡" : "❌") : null;
+                                  return (
+                                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "8px", background: correct ? "#dcfce7" : isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${correct ? "#22c55e" : isMe ? "var(--green)" : "var(--border)"}` }}>
+                                      <AvatarDisplay url={p.avatarUrl} name={p.name} size={20} />
+                                      <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{p.name.split(" ")[0]}</span>
+                                      <span style={{ fontSize: "12px", fontWeight: 800, color: correct ? "#166534" : isMe ? "var(--green)" : "var(--text)", flexShrink: 0 }}>{pr.home}–{pr.away}</span>
+                                      {indicator && <span style={{ fontSize: "12px", flexShrink: 0 }}>{indicator}</span>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })()}

@@ -252,7 +252,7 @@ export default function App() {
           adminState={adminState}
           currentPlayerId={currentPlayer.id}
         />}
-        {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} allPlayers={leaguePlayers} />}
+        {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} allPlayers={leaguePlayers} adminState={adminState} />}
         {predTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} confirmedTeams={confirmedTeams} />}
         {predTab === "standings" && <GroupStandings adminState={adminState} />}
         {predTab === "teams" && <TeamInfo />}
