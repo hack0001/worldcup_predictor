@@ -22,7 +22,13 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
-  const [fetchedStats, setFetchedStats] = useState<null | { name: string; country: string; goals: number; approved: boolean; noMatch: boolean; squadName?: string }[]>(null);
+  const [fetchedStats, setFetchedStats] = useState<null | {
+    name: string; country: string; goals: number; assists: number;
+    yellowCards: number; redCards: number; minutesPlayed: number;
+    approved: boolean; noMatch: boolean;
+  }[]>(null);
+  const [squadPlayers, setSquadPlayers] = useState<{name: string; country: string; position: string; pickedBy: string[]}[]>([]);
+  const [showSquadList, setShowSquadList] = useState(false);
   const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
@@ -433,113 +439,209 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
 
       {activeSection === "stats" && (
         <div>
-          {/* Fetch from openfootball */}
-          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid var(--green)" }}>
+          {/* ── Squad Players List ── */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "13px" }}>👕 Fantasy Squad Selections</p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>All players picked by at least one user</p>
+              </div>
+              <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => {
+                const map: Record<string, { country: string; position: string; pickedBy: string[] }> = {};
+                users.forEach(u => {
+                  const squad = userFantasySquads[u.id] || [];
+                  squad.forEach(playerName => {
+                    if (!map[playerName]) {
+                      let country = "Unknown", position = "FWD";
+                      for (const [c, { players }] of Object.entries(SQUADS)) {
+                        const p = (players as {name:string;position:string}[]).find(p => p.name === playerName);
+                        if (p) { country = c; position = p.position; break; }
+                      }
+                      map[playerName] = { country, position, pickedBy: [] };
+                    }
+                    map[playerName].pickedBy.push(u.name);
+                  });
+                });
+                setSquadPlayers(Object.entries(map).map(([name, v]) => ({ name, ...v })).sort((a,b) => b.pickedBy.length - a.pickedBy.length));
+                setShowSquadList(s => !s);
+              }}>{showSquadList ? "Hide" : `Show ${(() => { const s=new Set<string>(); users.forEach(u=>(userFantasySquads[u.id]||[]).forEach(n=>s.add(n))); return s.size; })()} players`}</button>
+            </div>
+            {showSquadList && squadPlayers.length > 0 && (
+              <div style={{ marginTop: "12px", overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                      <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 700, color: "var(--text-2)" }}>Player</th>
+                      <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 700, color: "var(--text-2)" }}>Country</th>
+                      <th style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: "var(--text-2)" }}>Pos</th>
+                      <th style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: "var(--text-2)" }}>Picked by</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {squadPlayers.map(p => (
+                      <tr key={p.name} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{p.name}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--text-2)" }}>{p.country}</td>
+                        <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "3px", background: ({GK:"#fef3c7",DEF:"#dbeafe",MID:"#dcfce7",FWD:"#fee2e2"} as Record<string,string>)[p.position]||"var(--surface2)", color: ({GK:"#92400e",DEF:"#1e40af",MID:"#166534",FWD:"#991b1b"} as Record<string,string>)[p.position]||"var(--text)" }}>{p.position}</span>
+                        </td>
+                        <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--green)" }}>{p.pickedBy.length}</span>
+                          <span style={{ fontSize: "10px", color: "var(--text-3)", marginLeft: "4px" }}>({p.pickedBy.join(", ")})</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Fetch from API-Football ── */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid #3b82f6" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <div>
-                <p style={{ fontWeight: 700, fontSize: "13px" }}>⚡ Import Goals from Live Data</p>
-                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Fetches openfootball.github.io · goals only · review before saving</p>
+                <p style={{ fontWeight: 700, fontSize: "13px" }}>⚡ Import Stats from API-Football</p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Goals · Assists · Yellow/Red cards · Minutes · For squad picks only</p>
               </div>
               <button className="btn-primary" style={{ fontSize: "12px", flexShrink: 0 }} disabled={fetchingStats} onClick={async () => {
                 setFetchingStats(true); setFetchedStats(null);
+                const API_KEY = "9a8fadd79ce9721d14754b6f6551195b";
+                const NAME_MAP: Record<string, string> = {
+                  "Julián Quiñones":"Julian Quinones","Raúl Jiménez":"Raul Jimenez",
+                  "Hwang In-Beom":"Hwang Inbeom","Oh Hyeon-Gyu":"Oh Hyeongyu",
+                  "Ladislav Krejcí":"Ladislav Krejci","Jovo Lukić":"Jovo Lukic",
+                  "Vinícius Júnior":"Vinicius Jr","Giovanni Reyna":"Gio Reyna",
+                  "Viktor Gyökeres":"Viktor Gyokeres","Mattias Svanberg":"Mikel Svanberg",
+                };
+                // Build squad player set
+                const squadSet = new Set<string>();
+                users.forEach(u => (userFantasySquads[u.id]||[]).forEach(n => squadSet.add(n)));
+
                 try {
-                  // Name mapping: openfootball name → SQUADS name
-                  const NAME_MAP: Record<string, string> = {
-                    "Julián Quiñones": "Julian Quinones",
-                    "Raúl Jiménez": "Raul Jimenez",
-                    "Hwang In-Beom": "Hwang Inbeom",
-                    "Oh Hyeon-Gyu": "Oh Hyeongyu",
-                    "Ladislav Krejcí": "Ladislav Krejci",
-                    "Jovo Lukić": "Jovo Lukic",
-                    "Vinícius Júnior": "Vinicius Jr",
-                    "Giovanni Reyna": "Gio Reyna",
-                    "Viktor Gyökeres": "Viktor Gyokeres",
-                    "Mattias Svanberg": "Mikel Svanberg",
-                    "Oh Hyeongyu": "Oh Hyeongyu",
+                  // Fetch top scorers (includes assists, cards, minutes)
+                  const [goalsRes, assistsRes, yellowRes] = await Promise.all([
+                    fetch("https://v3.football.api-sports.io/players/topscorers?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
+                    fetch("https://v3.football.api-sports.io/players/topassists?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
+                    fetch("https://v3.football.api-sports.io/players/topyellowcards?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
+                  ]);
+                  const [gData, aData, yData] = await Promise.all([goalsRes.json(), assistsRes.json(), yellowRes.json()]);
+
+                  // Also fetch from openfootball for goal cross-check
+                  const ofRes = await fetch("https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json");
+                  const ofData = await ofRes.json();
+                  const ofGoals: Record<string, number> = {};
+                  for (const m of ofData.matches || []) {
+                    if (!m.score) continue;
+                    for (const g of [...(m.goals1||[]),...(m.goals2||[])]) {
+                      if (g.name?.includes("(o.g.)")) continue;
+                      const raw = g.name.replace(/\s*\(.*\)/,"").trim();
+                      const mapped = NAME_MAP[raw]||raw;
+                      ofGoals[mapped] = (ofGoals[mapped]||0)+1;
+                    }
+                  }
+
+                  // Merge all data into player map
+                  type P = { goals:number; assists:number; yellowCards:number; redCards:number; minutesPlayed:number; country:string; apiName:string };
+                  const playerMap: Record<string, P> = {};
+
+                  const extractName = (raw: string) => NAME_MAP[raw] || raw;
+
+                  const processApiList = (data: {response?: {player:{name:string;nationality:string};statistics:{games:{minutes:number|null};goals:{total:number|null;assists:number|null};cards:{yellow:number;red:number}}[]}[]}, field: "goals"|"assists"|"cards") => {
+                    for (const item of data?.response || []) {
+                      const name = extractName(item.player.name);
+                      const st = item.statistics[0];
+                      if (!playerMap[name]) playerMap[name] = { goals:0, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:item.player.nationality, apiName:item.player.name };
+                      playerMap[name].minutesPlayed = st.games.minutes||0;
+                      if (field==="goals") { playerMap[name].goals=st.goals.total||0; playerMap[name].assists=st.goals.assists||0; }
+                      if (field==="assists") { if(!playerMap[name].assists) playerMap[name].assists=st.goals.assists||0; }
+                      if (field==="cards") { playerMap[name].yellowCards=st.cards.yellow||0; playerMap[name].redCards=st.cards.red||0; }
+                    }
                   };
 
-                  const res = await fetch("https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json");
-                  const data = await res.json();
+                  processApiList(gData, "goals");
+                  processApiList(aData, "assists");
+                  processApiList(yData, "cards");
 
-                  // Tally goals per player from completed matches
-                  const goals: Record<string, number> = {};
-                  for (const m of data.matches || []) {
-                    if (!m.score) continue;
-                    for (const g of [...(m.goals1 || []), ...(m.goals2 || [])]) {
-                      if (g.name?.includes("(o.g.)")) continue; // skip own goals
-                      const raw = g.name.replace(/\s*\(.*\)/, "").trim();
-                      const mapped = NAME_MAP[raw] || raw;
-                      goals[mapped] = (goals[mapped] || 0) + 1;
+                  // Also add openfootball-only scorers not in API response
+                  for (const [name, g] of Object.entries(ofGoals)) {
+                    if (!playerMap[name]) {
+                      const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(p=>p.name===name));
+                      playerMap[name] = { goals:g, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:squadInfo?.[0]||"Unknown", apiName:name };
                     }
                   }
 
-                  // Build all squad players from all users' fantasy picks
-                  const allSquadPlayers = new Set<string>();
-                  Object.values(userFantasySquads).forEach(squad => squad.forEach(n => allSquadPlayers.add(n)));
-
-                  // Find which scorers are in user squads, and match to SQUADS data for country
-                  const squadPlayerMap: Record<string, { country: string }> = {};
-                  for (const [country, { players }] of Object.entries(SQUADS)) {
-                    for (const p of players) {
-                      squadPlayerMap[p.name] = { country };
-                    }
-                  }
-
-                  const results = Object.entries(goals).map(([name, g]) => {
-                    const inSquad = allSquadPlayers.has(name);
-                    const squadInfo = squadPlayerMap[name];
-                    return {
-                      name,
-                      country: squadInfo?.country || "Unknown",
-                      goals: g,
-                      approved: inSquad && !!squadInfo, // pre-approve squad picks with known country
-                      noMatch: !squadInfo,
-                    };
-                  }).sort((a, b) => b.goals - a.goals);
+                  const results = Object.entries(playerMap).map(([name, p]) => {
+                    const inSquad = squadSet.has(name);
+                    const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(pl=>pl.name===name));
+                    return { name, country: squadInfo?.[0]||p.country, goals:p.goals, assists:p.assists, yellowCards:p.yellowCards, redCards:p.redCards, minutesPlayed:p.minutesPlayed, approved:inSquad&&!!squadInfo, noMatch:!squadInfo };
+                  }).filter(p => p.goals>0||p.assists>0||p.yellowCards>0)
+                    .sort((a,b) => b.goals-a.goals||b.assists-a.assists);
 
                   setFetchedStats(results);
-                } catch (e) {
-                  alert("Failed to fetch stats. Check network.");
-                }
+                } catch(e) { alert("Failed to fetch. Check console."); console.error(e); }
                 setFetchingStats(false);
               }}>{fetchingStats ? "Fetching..." : "🔄 Fetch Stats"}</button>
             </div>
 
             {fetchedStats && (
               <div style={{ marginTop: "12px" }}>
-                <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "8px" }}>
-                  Found {fetchedStats.length} scorers · {fetchedStats.filter(s => !s.noMatch).length} matched to squads · {fetchedStats.filter(s => s.noMatch).length} unrecognised
-                </p>
-                <div style={{ display: "grid", gap: "4px", maxHeight: "320px", overflowY: "auto" }}>
-                  {fetchedStats.map((s, i) => (
-                    <div key={s.name} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "6px", background: s.noMatch ? "#fef9c3" : "var(--surface2)", border: `1px solid ${s.noMatch ? "#fde047" : "var(--border)"}`, opacity: s.noMatch ? 0.7 : 1 }}>
-                      <input type="checkbox" checked={s.approved} disabled={s.noMatch} onChange={e => setFetchedStats(prev => prev!.map((x, j) => j === i ? { ...x, approved: e.target.checked } : x))} style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontWeight: 700, fontSize: "13px" }}>{s.name}</span>
-                        {s.noMatch && <span style={{ fontSize: "10px", color: "#92400e", marginLeft: "6px" }}>⚠️ not in any squad</span>}
-                        {!s.noMatch && <span style={{ fontSize: "11px", color: "var(--text-3)", marginLeft: "6px" }}>{s.country}</span>}
-                      </div>
-                      <span style={{ fontWeight: 800, fontSize: "14px", color: "var(--green)" }}>{s.goals} ⚽</span>
-                    </div>
-                  ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <p style={{ fontSize: "12px", color: "var(--text-2)" }}>
+                    {fetchedStats.filter(s=>s.approved).length} pre-approved (in squads) · {fetchedStats.filter(s=>s.noMatch).length} unrecognised
+                  </p>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button className="btn-ghost" style={{ fontSize: "11px" }} onClick={() => setFetchedStats(prev => prev!.map(s => ({...s, approved: !s.noMatch})))}>Select all</button>
+                    <button className="btn-ghost" style={{ fontSize: "11px" }} onClick={() => setFetchedStats(prev => prev!.map(s => ({...s, approved: false})))}>Clear all</button>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                        <th style={{ padding: "7px 8px", width: 28 }}></th>
+                        <th style={{ padding: "7px 10px", textAlign: "left", fontWeight: 700, color: "var(--text-2)" }}>Player</th>
+                        <th style={{ padding: "7px 8px", textAlign: "left", fontWeight: 700, color: "var(--text-2)" }}>Country</th>
+                        <th style={{ padding: "7px 8px", textAlign: "center", fontWeight: 700, color: "var(--green)" }}>⚽</th>
+                        <th style={{ padding: "7px 8px", textAlign: "center", fontWeight: 700, color: "#3b82f6" }}>🅰️</th>
+                        <th style={{ padding: "7px 8px", textAlign: "center", fontWeight: 700, color: "#f59e0b" }}>🟨</th>
+                        <th style={{ padding: "7px 8px", textAlign: "center", fontWeight: 700, color: "#ef4444" }}>🟥</th>
+                        <th style={{ padding: "7px 8px", textAlign: "center", fontWeight: 700, color: "var(--text-3)" }}>Mins</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fetchedStats.map((s, i) => (
+                        <tr key={s.name} style={{ borderBottom: "1px solid var(--border)", background: s.noMatch ? "#fffbeb" : s.approved ? "var(--green-light)" : "transparent", opacity: s.noMatch ? 0.6 : 1 }}>
+                          <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                            <input type="checkbox" checked={s.approved} disabled={s.noMatch} onChange={e => setFetchedStats(prev => prev!.map((x,j)=>j===i?{...x,approved:e.target.checked}:x))} />
+                          </td>
+                          <td style={{ padding: "6px 10px", fontWeight: 600 }}>
+                            {s.name}
+                            {s.noMatch && <span style={{ fontSize: "9px", color: "#92400e", marginLeft: "4px" }}>⚠️</span>}
+                          </td>
+                          <td style={{ padding: "6px 10px", color: "var(--text-2)" }}>{s.country}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.goals>0?"var(--green)":"var(--text-3)" }}>{s.goals||"–"}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.assists>0?"#3b82f6":"var(--text-3)" }}>{s.assists||"–"}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.yellowCards>0?"#d97706":"var(--text-3)" }}>{s.yellowCards||"–"}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.redCards>0?"#ef4444":"var(--text-3)" }}>{s.redCards||"–"}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center", color: "var(--text-2)" }}>{s.minutesPlayed||"–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: "flex", gap: "8px", marginTop: "10px", alignItems: "center" }}>
                   <button className="btn-primary" style={{ fontSize: "12px" }} onClick={async () => {
                     const toSave = fetchedStats.filter(s => s.approved);
                     for (const s of toSave) {
-                      // Find or update existing stat
-                      const existing = stats.find(st => st.playerName === s.name && st.country === s.country);
+                      const existing = stats.find(st => st.playerName === s.name);
                       const stat: PlayerStat = {
-                        id: existing?.id || `${s.country}-${s.name}`.replace(/\s/g, "-").toLowerCase(),
-                        playerName: s.name,
-                        country: s.country,
-                        goals: s.goals,
-                        assists: existing?.assists || 0,
-                        cleanSheets: existing?.cleanSheets || 0,
-                        yellowCards: existing?.yellowCards || 0,
-                        redCards: existing?.redCards || 0,
-                        saves: existing?.saves || 0,
-                        minutesPlayed: existing?.minutesPlayed || 0,
+                        id: existing?.id || `${s.country}-${s.name}`.replace(/[\s\W]/g,"-").toLowerCase(),
+                        playerName: s.name, country: s.country,
+                        goals: s.goals, assists: s.assists,
+                        yellowCards: s.yellowCards, redCards: s.redCards,
+                        minutesPlayed: s.minutesPlayed,
+                        cleanSheets: existing?.cleanSheets||0, saves: existing?.saves||0,
                         round: "group",
                       };
                       await savePlayerStat(stat);
@@ -547,12 +649,14 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                     getAllPlayerStats().then(setStats);
                     setFetchedStats(null);
                     alert(`Saved ${toSave.length} player stats.`);
-                  }}>✅ Approve & Save {fetchedStats.filter(s => s.approved).length}</button>
+                  }}>✅ Approve & Save ({fetchedStats.filter(s=>s.approved).length})</button>
                   <button className="btn-ghost" style={{ fontSize: "12px" }} onClick={() => setFetchedStats(null)}>Cancel</button>
+                  <span style={{ fontSize: "11px", color: "var(--text-3)", marginLeft: "auto" }}>Saves merge with existing — won't overwrite GK clean sheets/saves</span>
                 </div>
               </div>
             )}
           </div>
+
           <div className="card" style={{ padding: "20px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "16px" }}>Add Player Performance</p>
             <div style={{ display: "grid", gap: "12px" }}>

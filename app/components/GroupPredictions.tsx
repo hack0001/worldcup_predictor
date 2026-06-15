@@ -213,7 +213,8 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                                   const pr = p.groupPredictions[match.id];
                                   const isMe = p.id === player.id;
                                   const correct = result && pr.home === result.home && pr.away === result.away;
-                                  const correctResult = result && ((Number(pr.home) > Number(pr.away)) === (Number(result.home) > Number(result.away)) || (pr.home === pr.away && result.home === result.away));
+                                  const getOutcome = (h: string, a: string) => Number(h) > Number(a) ? "H" : Number(h) < Number(a) ? "A" : "D";
+                                  const correctResult = result && !correct && getOutcome(pr.home, pr.away) === getOutcome(result.home, result.away);
                                   const indicator = correct ? "✅" : result ? (correctResult ? "🟡" : "❌") : null;
                                   return (
                                     <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "8px", background: correct ? "#dcfce7" : isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${correct ? "#22c55e" : isMe ? "var(--green)" : "var(--border)"}` }}>
