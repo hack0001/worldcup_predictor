@@ -22,6 +22,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
+  const [fetchedStats, setFetchedStats] = useState<null | { name: string; country: string; goals: number; approved: boolean; noMatch: boolean; squadName?: string }[]>(null);
+  const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
   const [editingLeague, setEditingLeague] = useState<{ id: string; name: string; code: string } | null>(null);
@@ -431,6 +433,126 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
 
       {activeSection === "stats" && (
         <div>
+          {/* Fetch from openfootball */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid var(--green)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "13px" }}>⚡ Import Goals from Live Data</p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Fetches openfootball.github.io · goals only · review before saving</p>
+              </div>
+              <button className="btn-primary" style={{ fontSize: "12px", flexShrink: 0 }} disabled={fetchingStats} onClick={async () => {
+                setFetchingStats(true); setFetchedStats(null);
+                try {
+                  // Name mapping: openfootball name → SQUADS name
+                  const NAME_MAP: Record<string, string> = {
+                    "Julián Quiñones": "Julian Quinones",
+                    "Raúl Jiménez": "Raul Jimenez",
+                    "Hwang In-Beom": "Hwang Inbeom",
+                    "Oh Hyeon-Gyu": "Oh Hyeongyu",
+                    "Ladislav Krejcí": "Ladislav Krejci",
+                    "Jovo Lukić": "Jovo Lukic",
+                    "Vinícius Júnior": "Vinicius Jr",
+                    "Giovanni Reyna": "Gio Reyna",
+                    "Viktor Gyökeres": "Viktor Gyokeres",
+                    "Mattias Svanberg": "Mikel Svanberg",
+                    "Oh Hyeongyu": "Oh Hyeongyu",
+                  };
+
+                  const res = await fetch("https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json");
+                  const data = await res.json();
+
+                  // Tally goals per player from completed matches
+                  const goals: Record<string, number> = {};
+                  for (const m of data.matches || []) {
+                    if (!m.score) continue;
+                    for (const g of [...(m.goals1 || []), ...(m.goals2 || [])]) {
+                      if (g.name?.includes("(o.g.)")) continue; // skip own goals
+                      const raw = g.name.replace(/\s*\(.*\)/, "").trim();
+                      const mapped = NAME_MAP[raw] || raw;
+                      goals[mapped] = (goals[mapped] || 0) + 1;
+                    }
+                  }
+
+                  // Build all squad players from all users' fantasy picks
+                  const allSquadPlayers = new Set<string>();
+                  Object.values(userFantasySquads).forEach(squad => squad.forEach(n => allSquadPlayers.add(n)));
+
+                  // Find which scorers are in user squads, and match to SQUADS data for country
+                  const squadPlayerMap: Record<string, { country: string }> = {};
+                  for (const [country, { players }] of Object.entries(SQUADS)) {
+                    for (const p of players) {
+                      squadPlayerMap[p.name] = { country };
+                    }
+                  }
+
+                  const results = Object.entries(goals).map(([name, g]) => {
+                    const inSquad = allSquadPlayers.has(name);
+                    const squadInfo = squadPlayerMap[name];
+                    return {
+                      name,
+                      country: squadInfo?.country || "Unknown",
+                      goals: g,
+                      approved: inSquad && !!squadInfo, // pre-approve squad picks with known country
+                      noMatch: !squadInfo,
+                    };
+                  }).sort((a, b) => b.goals - a.goals);
+
+                  setFetchedStats(results);
+                } catch (e) {
+                  alert("Failed to fetch stats. Check network.");
+                }
+                setFetchingStats(false);
+              }}>{fetchingStats ? "Fetching..." : "🔄 Fetch Stats"}</button>
+            </div>
+
+            {fetchedStats && (
+              <div style={{ marginTop: "12px" }}>
+                <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "8px" }}>
+                  Found {fetchedStats.length} scorers · {fetchedStats.filter(s => !s.noMatch).length} matched to squads · {fetchedStats.filter(s => s.noMatch).length} unrecognised
+                </p>
+                <div style={{ display: "grid", gap: "4px", maxHeight: "320px", overflowY: "auto" }}>
+                  {fetchedStats.map((s, i) => (
+                    <div key={s.name} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "6px", background: s.noMatch ? "#fef9c3" : "var(--surface2)", border: `1px solid ${s.noMatch ? "#fde047" : "var(--border)"}`, opacity: s.noMatch ? 0.7 : 1 }}>
+                      <input type="checkbox" checked={s.approved} disabled={s.noMatch} onChange={e => setFetchedStats(prev => prev!.map((x, j) => j === i ? { ...x, approved: e.target.checked } : x))} style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: 700, fontSize: "13px" }}>{s.name}</span>
+                        {s.noMatch && <span style={{ fontSize: "10px", color: "#92400e", marginLeft: "6px" }}>⚠️ not in any squad</span>}
+                        {!s.noMatch && <span style={{ fontSize: "11px", color: "var(--text-3)", marginLeft: "6px" }}>{s.country}</span>}
+                      </div>
+                      <span style={{ fontWeight: 800, fontSize: "14px", color: "var(--green)" }}>{s.goals} ⚽</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                  <button className="btn-primary" style={{ fontSize: "12px" }} onClick={async () => {
+                    const toSave = fetchedStats.filter(s => s.approved);
+                    for (const s of toSave) {
+                      // Find or update existing stat
+                      const existing = stats.find(st => st.playerName === s.name && st.country === s.country);
+                      const stat: PlayerStat = {
+                        id: existing?.id || `${s.country}-${s.name}`.replace(/\s/g, "-").toLowerCase(),
+                        playerName: s.name,
+                        country: s.country,
+                        goals: s.goals,
+                        assists: existing?.assists || 0,
+                        cleanSheets: existing?.cleanSheets || 0,
+                        yellowCards: existing?.yellowCards || 0,
+                        redCards: existing?.redCards || 0,
+                        saves: existing?.saves || 0,
+                        minutesPlayed: existing?.minutesPlayed || 0,
+                        round: "group",
+                      };
+                      await savePlayerStat(stat);
+                    }
+                    getAllPlayerStats().then(setStats);
+                    setFetchedStats(null);
+                    alert(`Saved ${toSave.length} player stats.`);
+                  }}>✅ Approve & Save {fetchedStats.filter(s => s.approved).length}</button>
+                  <button className="btn-ghost" style={{ fontSize: "12px" }} onClick={() => setFetchedStats(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="card" style={{ padding: "20px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "16px" }}>Add Player Performance</p>
             <div style={{ display: "grid", gap: "12px" }}>
