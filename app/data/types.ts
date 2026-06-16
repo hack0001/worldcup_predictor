@@ -87,6 +87,7 @@ export interface AdminState {
   playerOfTournament: string;
   predictionsLocked: boolean;
   lockTime: string | null;
+  fantasyLocked: boolean;
 }
 
 // ── Scoring constants ─────────────────────────────────────

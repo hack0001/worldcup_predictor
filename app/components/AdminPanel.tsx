@@ -278,24 +278,32 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           </div>
 
           {/* Fantasy Squad Lock */}
-          <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: "#dbeafe", background: "#eff6ff" }}>
+          <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: "#dbeafe", background: adminState.fantasyLocked ? "#f0fdf4" : "#eff6ff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <p style={{ fontWeight: 700, fontSize: "14px", color: "#1e40af" }}>👕 Fantasy Squad Lock</p>
-                <p style={{ fontSize: "12px", color: "#3730a3", marginTop: "2px" }}>Lock all players' fantasy squad selections so they can no longer be changed</p>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: adminState.fantasyLocked ? "var(--green)" : "#1e40af" }}>
+                  👕 Fantasy Squad Lock {adminState.fantasyLocked ? "— 🔒 LOCKED" : ""}
+                </p>
+                {adminState.fantasyLocked
+                  ? <p style={{ fontSize: "12px", color: "var(--green)", marginTop: "2px" }}>Squads are locked. Only players with incomplete squads can still edit.</p>
+                  : <p style={{ fontSize: "12px", color: "#3730a3", marginTop: "2px" }}>
+                      Locks all complete squads (11 players). Players with fewer than 11 can still edit.
+                      {" "}Currently: {Object.values(userFantasySquads).filter(s => s.length >= 11).length} complete, {Object.values(userFantasySquads).filter(s => s.length < 11).length} incomplete.
+                    </p>
+                }
               </div>
               <button
                 className="btn-secondary"
-                style={{ background: "#ef4444", borderColor: "#ef4444", color: "white", flexShrink: 0 }}
+                style={{ background: adminState.fantasyLocked ? "#ef4444" : "#1d4ed8", borderColor: adminState.fantasyLocked ? "#ef4444" : "#1d4ed8", color: "white", flexShrink: 0 }}
                 onClick={async () => {
-                  if (!confirm("Lock ALL users' fantasy squads? They won't be able to change their picks after this.")) return;
-                  const { supabase } = await import("@/lib/supabase");
-                  // Store fantasy lock flag in admin_state
-                  await supabase.from("admin_state").update({ fantasy_locked: true }).eq("id", 1);
-                  alert("Fantasy squads locked.");
+                  const newLocked = !adminState.fantasyLocked;
+                  if (newLocked && !confirm(`Lock all complete fantasy squads? Players with 11 picks can no longer change them.`)) return;
+                  const updated = { ...adminState, fantasyLocked: newLocked };
+                  await saveAdminState(updated);
+                  onUpdate(updated);
                 }}
               >
-                🔒 Lock Fantasy Squads
+                {adminState.fantasyLocked ? "🔓 Unlock Squads" : "🔒 Lock Fantasy Squads"}
               </button>
             </div>
           </div>

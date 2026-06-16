@@ -4,7 +4,7 @@ import { Player, FantasyPlayer, FantasySquad as FantasySquadType } from "@/app/d
 import { SQUADS, TEAM_FLAGS } from "@/app/data/worldcup";
 import { getFantasySquad, saveFantasySquad } from "@/lib/storage";
 
-interface Props { player: Player; }
+interface Props { player: Player; fantasyLocked?: boolean; }
 
 const POSITIONS: FantasyPlayer["position"][] = ["GK", "DEF", "MID", "FWD"];
 const FORMATIONS: Record<string, { DEF: number; MID: number; FWD: number; label: string }> = {
@@ -120,7 +120,7 @@ function PitchView({ squad, onRemove, positionLimits }: { squad: FantasyPlayer[]
 }
 
 // ── Main Component ─────────────────────────────────────────
-export default function FantasySquadPicker({ player }: Props) {
+export default function FantasySquadPicker({ player, fantasyLocked = false }: Props) {
   const [squad, setSquad] = useState<FantasyPlayer[]>([]);
   const [formation, setFormation] = useState(DEFAULT_FORMATION);
   const [loading, setLoading] = useState(true);
@@ -140,6 +140,8 @@ export default function FantasySquadPicker({ player }: Props) {
   }, [player.id]);
 
   const POSITION_LIMITS = { GK: 1, ...FORMATIONS[formation] };
+  // Locked if admin locked AND squad is complete (11 players)
+  const isLocked = fantasyLocked && squad.length >= 11;
 
   const persist = async (newSquad: FantasyPlayer[], newFormation = formation) => {
     setSaving(true);
@@ -150,6 +152,7 @@ export default function FantasySquadPicker({ player }: Props) {
   };
 
   const changeFormation = (newFormation: string) => {
+    if (isLocked) return;
     const newLimits = { GK: 1, ...FORMATIONS[newFormation] };
     // Remove players that exceed new limits
     const counts: Record<string, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
@@ -166,6 +169,7 @@ export default function FantasySquadPicker({ player }: Props) {
   };
 
   const addPlayer = (fp: FantasyPlayer) => {
+    if (isLocked) return;
     if (squad.length >= 11) return;
     if (squad.filter(s => s.position === fp.position).length >= Number(POSITION_LIMITS[fp.position as keyof typeof POSITION_LIMITS] || 0)) return;
     if (squad.find(s => s.name === fp.name)) return;
@@ -175,6 +179,7 @@ export default function FantasySquadPicker({ player }: Props) {
   };
 
   const removePlayer = (name: string) => {
+    if (isLocked) return;
     const next = squad.filter(s => s.name !== name);
     setSquad(next);
     persist(next);
@@ -202,6 +207,12 @@ export default function FantasySquadPicker({ player }: Props) {
             1 GK · {FORMATIONS[formation].DEF} DEF · {FORMATIONS[formation].MID} MID · {FORMATIONS[formation].FWD} FWD
           </p>
         </div>
+        {isLocked && (
+          <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: "8px", padding: "8px 14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "16px" }}>🔒</span>
+            <p style={{ fontSize: "13px", fontWeight: 600, color: "#991b1b" }}>Your squad is locked — selections can no longer be changed.</p>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {/* Formation picker */}
           <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", justifyContent: "flex-end" }}>
