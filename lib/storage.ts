@@ -127,7 +127,9 @@ export async function getAllPlayerStats(): Promise<PlayerStat[]> {
   }));
 }
 export async function savePlayerStat(stat: PlayerStat): Promise<void> {
-  await supabase.from("player_stats").upsert({
+  // Delete any existing row for this player first to avoid duplicates
+  await supabase.from("player_stats").delete().eq("player_name", stat.playerName);
+  await supabase.from("player_stats").insert({
     id: stat.id, player_name: stat.playerName, country: stat.country,
     goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
     yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,

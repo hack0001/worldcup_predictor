@@ -19,7 +19,7 @@ const ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter Finals", "
 
 export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [authenticated] = useState(true); // Auth handled by page-level login
-  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues">("results");
+  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
   const [fetchedStats, setFetchedStats] = useState<null | {
@@ -232,6 +232,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
         <button className={activeSection === "form" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("form")}>📋 Team Form</button>
         <button className={activeSection === "users" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("users")}>👥 Users ({users.length})</button>
         <button className={activeSection === "leagues" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("leagues")}>🏆 Leagues</button>
+        <button className={activeSection === "autofill" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("autofill")}>⚡ Auto-fill</button>
       </div>
 
       {activeSection === "results" && (
@@ -273,6 +274,29 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>
                 Tournament starts 11 Jun 2026 · 20:00 BST. Set this to lock automatically at kick-off.
               </p>
+            </div>
+          </div>
+
+          {/* Fantasy Squad Lock */}
+          <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: "#dbeafe", background: "#eff6ff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: "#1e40af" }}>👕 Fantasy Squad Lock</p>
+                <p style={{ fontSize: "12px", color: "#3730a3", marginTop: "2px" }}>Lock all players' fantasy squad selections so they can no longer be changed</p>
+              </div>
+              <button
+                className="btn-secondary"
+                style={{ background: "#ef4444", borderColor: "#ef4444", color: "white", flexShrink: 0 }}
+                onClick={async () => {
+                  if (!confirm("Lock ALL users' fantasy squads? They won't be able to change their picks after this.")) return;
+                  const { supabase } = await import("@/lib/supabase");
+                  // Store fantasy lock flag in admin_state
+                  await supabase.from("admin_state").update({ fantasy_locked: true }).eq("id", 1);
+                  alert("Fantasy squads locked.");
+                }}
+              >
+                🔒 Lock Fantasy Squads
+              </button>
             </div>
           </div>
 
@@ -1275,6 +1299,86 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
           </div>
         </div>
       )}
+      {activeSection === "autofill" && (() => {
+        const now = new Date();
+        const in96h = new Date(now.getTime() + 96*60*60*1000);
+        const months: Record<string,number> = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+        const parseKO = (d: string, t: string) => {
+          const [day,mon]=d.split(" "); const [hh,mm]=t.replace(/ BST| GMT/,"").split(":");
+          return new Date(Date.UTC(2026,months[mon],+day,+hh-(t.includes("BST")?1:0),+mm));
+        };
+        const upcoming = GROUP_MATCHES.filter(m => { const ko=parseKO(m.dateUK,m.timeUK); return ko>=now&&ko<=in96h; });
+        const scores = [["1","1"],["2","1"],["1","2"]];
+        return (
+          <div>
+            <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
+              Matches in the next 96 hours · shows players who haven't predicted · click Auto-fill or fill all at once
+            </p>
+            {upcoming.length === 0 && <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)" }}>No matches in next 96 hours</div>}
+            <div style={{ display: "grid", gap: "10px" }}>
+              {upcoming.map(m => {
+                const home = typeof m.home==="string"?m.home:(m.home as {team:string}).team;
+                const away = typeof m.away==="string"?m.away:(m.away as {team:string}).team;
+                const ko = parseKO(m.dateUK, m.timeUK);
+                const diffH = Math.round((ko.getTime()-now.getTime())/3600000);
+                const missing = users.filter(u => !u.groupPredictions?.[m.id]);
+                const done = users.filter(u => u.groupPredictions?.[m.id]);
+                return (
+                  <div key={m.id} className="card" style={{ padding: "14px 16px", borderLeft: `3px solid ${diffH<3?"#ef4444":"#f59e0b"}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                      <div>
+                        <p style={{ fontWeight: 700, fontSize: "14px" }}>{home} vs {away}</p>
+                        <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Group {m.group} · {m.dateUK} {m.timeUK} · {diffH}h away</p>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700 }}>✓ {done.length}</span>
+                        {missing.length > 0 && (
+                          <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px" }} onClick={async () => {
+                            if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} player(s)?`)) return;
+                            for (const u of missing) {
+                              const s = scores[Math.floor(Math.random()*3)];
+                              const updated = { ...u, groupPredictions: { ...u.groupPredictions, [m.id]: { home: s[0], away: s[1] } } };
+                              await savePlayer(updated);
+                              setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                            }
+                          }}>⚡ Fill {missing.length} missing</button>
+                        )}
+                      </div>
+                    </div>
+                    {missing.length > 0 && (
+                      <div>
+                        <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px" }}>Missing:</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {missing.map(u => (
+                            <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", fontSize: "11px" }}>
+                              <span>{u.name}</span>
+                              <button onClick={async () => {
+                                const s = scores[Math.floor(Math.random()*3)];
+                                const updated = { ...u, groupPredictions: { ...u.groupPredictions, [m.id]: { home: s[0], away: s[1] } } };
+                                await savePlayer(updated);
+                                setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                              }} style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, fontSize: "11px", padding: "0 2px" }}>⚡</button>
+                            </div>
+                          ))}
+                        </div>
+                        {done.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                            {done.map(u => {
+                              const pr = u.groupPredictions[m.id];
+                              return <span key={u.id} style={{ fontSize: "11px", background: "var(--green-light)", borderRadius: "99px", padding: "2px 8px", color: "var(--green)", fontWeight: 600 }}>{u.name}: {pr.home}-{pr.away}</span>;
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {missing.length === 0 && <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✅ All {done.length} players predicted</p>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

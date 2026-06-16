@@ -152,6 +152,7 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                 const pred = player.groupPredictions[match.id];
                 const filled = pred?.home !== "" && pred?.away !== "" && pred?.home !== undefined;
                 const locked = isMatchLocked(match.dateUK, match.timeUK);
+                const result = adminState?.results?.group?.[match.id];
                 return (
                   <div key={match.id} className="card" style={{ padding: "10px 14px", borderColor: locked ? "#fde68a" : filled ? "#bbf7d0" : undefined, opacity: locked ? 0.85 : 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "7px" }}>
@@ -179,10 +180,19 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                       <span style={{ flex: 1, textAlign: "right", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
                         <Flag country={match.home.team} /> {match.home.team}
                       </span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
-                        <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
-                        <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0, flexDirection: "column", minWidth: "60px" }}>
+                        {locked && result ? (
+                          <div style={{ textAlign: "center" }}>
+                            <p style={{ fontSize: "9px", fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1px" }}>Final Score</p>
+                            <p style={{ fontSize: "20px", fontWeight: 900, color: "#713f12", lineHeight: 1 }}>{result.home}–{result.away}</p>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                            <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.home ?? ""} onChange={e => updateScore(match.id, "home", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
+                            <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
+                            <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred?.away ?? ""} onChange={e => updateScore(match.id, "away", e.target.value, match.dateUK, match.timeUK)} disabled={readonly || locked} />
+                          </div>
+                        )}
                       </div>
                       <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
                         <Flag country={match.away.team} /> {match.away.team}
@@ -190,7 +200,6 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                     </div>
                     {/* Everyone's predictions below match row - mobile friendly */}
                     {locked && allPlayers.length > 0 && (() => {
-                      const result = adminState?.results?.group?.[match.id];
                       const preds = allPlayers.filter(p => {
                         const pr = p.groupPredictions?.[match.id];
                         return pr?.home !== undefined && pr?.away !== undefined;
@@ -198,13 +207,7 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                       if (!preds.length && !result) return null;
                       return (
                         <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--border)" }}>
-                          {/* Actual score */}
-                          {result && (
-                            <div style={{ textAlign: "center", marginBottom: "8px", padding: "6px", background: "#fef9c3", borderRadius: "8px", border: "1px solid #fde047" }}>
-                              <p style={{ fontSize: "10px", fontWeight: 700, color: "#854d0e", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Final Score</p>
-                              <p style={{ fontSize: "20px", fontWeight: 900, color: "#713f12" }}>{result.home} – {result.away}</p>
-                            </div>
-                          )}
+
                           {preds.length > 0 && (
                             <>
                               <p style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Predictions</p>
