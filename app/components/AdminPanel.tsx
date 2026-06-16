@@ -526,7 +526,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: "13px" }}>⚡ Import Stats from API-Football</p>
-                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Goals · Assists · Yellow/Red cards · Minutes · For squad picks only</p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)" }}>Goals auto-fetched · edit assists/cards inline · squad picks only</p>
               </div>
               <button className="btn-primary" style={{ fontSize: "12px", flexShrink: 0 }} disabled={fetchingStats} onClick={async () => {
                 setFetchingStats(true); setFetchedStats(null);
@@ -536,80 +536,112 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   "Hwang In-Beom":"Hwang Inbeom","Oh Hyeon-Gyu":"Oh Hyeongyu",
                   "Ladislav Krejcí":"Ladislav Krejci","Jovo Lukić":"Jovo Lukic",
                   "Vinícius Júnior":"Vinicius Jr","Giovanni Reyna":"Gio Reyna",
-                  "Viktor Gyökeres":"Viktor Gyokeres","Mattias Svanberg":"Mikel Svanberg",
+                  "Viktor Gyökeres":"Viktor Gyokeres","Damián Bobadilla":"Damian Bobadilla",
                 };
-                // Build squad player set
                 const squadSet = new Set<string>();
                 users.forEach(u => (userFantasySquads[u.id]||[]).forEach(n => squadSet.add(n)));
 
-                try {
-                  // Fetch top scorers (includes assists, cards, minutes)
-                  const [goalsRes, assistsRes, yellowRes] = await Promise.all([
-                    fetch("https://v3.football.api-sports.io/players/topscorers?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
-                    fetch("https://v3.football.api-sports.io/players/topassists?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
-                    fetch("https://v3.football.api-sports.io/players/topyellowcards?league=1&season=2026", { headers: { "x-apisports-key": API_KEY } }),
-                  ]);
-                  const [gData, aData, yData] = await Promise.all([goalsRes.json(), assistsRes.json(), yellowRes.json()]);
+                type P = { goals:number; assists:number; yellowCards:number; redCards:number; minutesPlayed:number; country:string };
+                const playerMap: Record<string, P> = {};
+                const extractName = (raw: string) => NAME_MAP[raw] || raw;
 
-                  // Also fetch from openfootball for goal cross-check
+                const addToMap = (name: string, country: string, g: number, a: number, y: number, r: number, mins: number) => {
+                  if (!playerMap[name]) playerMap[name] = { goals:0, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country };
+                  playerMap[name].goals += g;
+                  playerMap[name].assists += a;
+                  playerMap[name].yellowCards += y;
+                  playerMap[name].redCards += r;
+                  playerMap[name].minutesPlayed += mins;
+                };
+
+                try {
+                  // Step 1: Get completed WC 2026 fixture IDs from API-Football
+                  const fixtRes = await fetch(
+                    "https://v3.football.api-sports.io/fixtures?league=1&season=2026&status=FT",
+                    { headers: { "x-apisports-key": API_KEY } }
+                  );
+                  const fixtData = await fixtRes.json();
+                  const fixtureIds: number[] = (fixtData.response || []).map((f: {fixture:{id:number}}) => f.fixture.id);
+
+                  if (fixtureIds.length > 0) {
+                    // Step 2: Fetch player stats per fixture
+                    for (const fid of fixtureIds) {
+                      const pRes = await fetch(
+                        `https://v3.football.api-sports.io/fixtures/players?fixture=${fid}`,
+                        { headers: { "x-apisports-key": API_KEY } }
+                      );
+                      const pData = await pRes.json();
+                      for (const team of (pData.response || [])) {
+                        const country = team.team?.name || "";
+                        for (const pe of (team.players || [])) {
+                          const name = extractName(pe.player?.name || "");
+                          const s = pe.statistics?.[0];
+                          if (!s) continue;
+                          addToMap(name, country,
+                            s.goals?.total || 0,
+                            s.goals?.assists || 0,
+                            s.cards?.yellow || 0,
+                            s.cards?.red || 0,
+                            s.games?.minutes || 0
+                          );
+                        }
+                      }
+                      await new Promise(r => setTimeout(r, 200));
+                    }
+                  }
+
+                  // Always supplement goals from openfootball (more reliable for goals)
                   const ofRes = await fetch("https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json");
                   const ofData = await ofRes.json();
-                  const ofGoals: Record<string, number> = {};
                   for (const m of ofData.matches || []) {
                     if (!m.score) continue;
                     for (const g of [...(m.goals1||[]),...(m.goals2||[])]) {
                       if (g.name?.includes("(o.g.)")) continue;
-                      const raw = g.name.replace(/\s*\(.*\)/,"").trim();
-                      const mapped = NAME_MAP[raw]||raw;
-                      ofGoals[mapped] = (ofGoals[mapped]||0)+1;
+                      const name = extractName(g.name.replace(/\s*\(.*\)/,"").trim());
+                      if (!playerMap[name]) {
+                        const sq = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(p=>p.name===name));
+                        playerMap[name] = { goals:0, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:sq?.[0]||"" };
+                      }
+                      // Use max to avoid double-counting if API already has it
+                      playerMap[name].goals = Math.max(playerMap[name].goals, (playerMap[name].goals > 0 ? playerMap[name].goals : 0) + (fixtureIds.length === 0 ? 1 : 0));
+                      if (fixtureIds.length === 0) playerMap[name].goals += 1;
+                    }
+                  }
+                  // If API had no fixtures, use openfootball goals directly
+                  if (fixtureIds.length === 0) {
+                    for (const m of ofData.matches || []) {
+                      if (!m.score) continue;
+                      for (const g of [...(m.goals1||[]),...(m.goals2||[])]) {
+                        if (g.name?.includes("(o.g.)")) continue;
+                        const name = extractName(g.name.replace(/\s*\(.*\)/,"").trim());
+                        addToMap(name, "", 1, 0, 0, 0, 0);
+                      }
                     }
                   }
 
-                  // Merge all data into player map
-                  type P = { goals:number; assists:number; yellowCards:number; redCards:number; minutesPlayed:number; country:string; apiName:string };
-                  const playerMap: Record<string, P> = {};
-
-                  const extractName = (raw: string) => NAME_MAP[raw] || raw;
-
-                  // Process each API list - always take max values, never overwrite with lower
-                  const processApiList = (data: {response?: {player:{name:string;nationality:string};statistics:{games:{minutes:number|null};goals:{total:number|null;assists:number|null};cards:{yellow:number;red:number}}[]}[]}) => {
-                    for (const item of data?.response || []) {
-                      const name = extractName(item.player.name);
-                      const st = item.statistics[0];
-                      if (!playerMap[name]) playerMap[name] = { goals:0, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:item.player.nationality, apiName:item.player.name };
-                      const p = playerMap[name];
-                      p.minutesPlayed = Math.max(p.minutesPlayed, st.games.minutes||0);
-                      p.goals = Math.max(p.goals, st.goals.total||0);
-                      p.assists = Math.max(p.assists, st.goals.assists||0);
-                      p.yellowCards = Math.max(p.yellowCards, st.cards.yellow||0);
-                      p.redCards = Math.max(p.redCards, st.cards.red||0);
-                    }
-                  };
-
-                  processApiList(gData);
-                  processApiList(aData);
-                  processApiList(yData);
-
-                  // Add openfootball scorers as fallback for anyone missing from API
-                  for (const [name, g] of Object.entries(ofGoals)) {
-                    if (!playerMap[name]) {
-                      const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(p=>p.name===name));
-                      playerMap[name] = { goals:g, assists:0, yellowCards:0, redCards:0, minutesPlayed:0, country:squadInfo?.[0]||"Unknown", apiName:name };
-                    } else {
-                      playerMap[name].goals = Math.max(playerMap[name].goals, g);
-                    }
-                  }
-
-                  // Build results - ONLY show players in fantasy squads
-                  const results = Object.entries(playerMap).map(([name, p]) => {
-                    const inSquad = squadSet.has(name);
-                    const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(pl=>pl.name===name));
-                    return { name, country: squadInfo?.[0]||p.country, goals:p.goals, assists:p.assists, yellowCards:p.yellowCards, redCards:p.redCards, minutesPlayed:p.minutesPlayed, approved:inSquad&&!!squadInfo, noMatch:!squadInfo };
-                  }).filter(p => squadSet.has(p.name)) // ONLY squad picks
+                  // Build results filtered to squad picks only
+                  const results = Object.entries(playerMap)
+                    .filter(([name]) => squadSet.has(name))
+                    .map(([name, p]) => {
+                      const squadInfo = Object.entries(SQUADS).find(([,s]) => (s.players as {name:string}[]).some(pl=>pl.name===name));
+                      const existing = stats.find(s => s.playerName === name);
+                      return {
+                        name, country: squadInfo?.[0]||p.country,
+                        goals: p.goals,
+                        assists: p.assists || existing?.assists || 0,
+                        yellowCards: p.yellowCards || existing?.yellowCards || 0,
+                        redCards: p.redCards || existing?.redCards || 0,
+                        minutesPlayed: p.minutesPlayed || existing?.minutesPlayed || 0,
+                        approved: !!squadInfo,
+                        noMatch: !squadInfo,
+                      };
+                    })
+                    .filter(p => p.goals>0||p.assists>0||p.yellowCards>0||p.minutesPlayed>0)
                     .sort((a,b) => b.goals-a.goals||b.assists-a.assists||b.yellowCards-a.yellowCards);
 
-                  setFetchedStats(results);
-                } catch(e) { alert("Failed to fetch. Check console."); console.error(e); }
+                  setFetchedStats(results.length > 0 ? results : null);
+                  if (results.length === 0) alert("No stats found for squad picks. API may have returned no data — try again or use openfootball fallback.");
+                } catch(e) { alert("Fetch failed — check console."); console.error(e); }
                 setFetchingStats(false);
               }}>{fetchingStats ? "Fetching..." : "🔄 Fetch Stats"}</button>
             </div>
@@ -650,11 +682,19 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                             {s.noMatch && <span style={{ fontSize: "9px", color: "#92400e", marginLeft: "4px" }}>⚠️</span>}
                           </td>
                           <td style={{ padding: "6px 10px", color: "var(--text-2)" }}>{s.country}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.goals>0?"var(--green)":"var(--text-3)" }}>{s.goals||"–"}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.assists>0?"#3b82f6":"var(--text-3)" }}>{s.assists||"–"}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.yellowCards>0?"#d97706":"var(--text-3)" }}>{s.yellowCards||"–"}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "center", fontWeight: 700, color: s.redCards>0?"#ef4444":"var(--text-3)" }}>{s.redCards||"–"}</td>
-                          <td style={{ padding: "6px 8px", textAlign: "center", color: "var(--text-2)" }}>{s.minutesPlayed||"–"}</td>
+                          <td style={{ padding: "4px 6px", textAlign: "center", fontWeight: 700, color: "var(--green)" }}>{s.goals}</td>
+                          <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                            <input type="number" min={0} max={10} value={s.assists} onChange={e => setFetchedStats(prev => prev!.map((x,j)=>j===i?{...x,assists:+e.target.value}:x))} style={{ width:36, textAlign:"center", padding:"2px", fontSize:"12px" }} />
+                          </td>
+                          <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                            <input type="number" min={0} max={3} value={s.yellowCards} onChange={e => setFetchedStats(prev => prev!.map((x,j)=>j===i?{...x,yellowCards:+e.target.value}:x))} style={{ width:36, textAlign:"center", padding:"2px", fontSize:"12px" }} />
+                          </td>
+                          <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                            <input type="number" min={0} max={1} value={s.redCards} onChange={e => setFetchedStats(prev => prev!.map((x,j)=>j===i?{...x,redCards:+e.target.value}:x))} style={{ width:36, textAlign:"center", padding:"2px", fontSize:"12px" }} />
+                          </td>
+                          <td style={{ padding: "4px 4px", textAlign: "center" }}>
+                            <input type="number" min={0} max={120} value={s.minutesPlayed} onChange={e => setFetchedStats(prev => prev!.map((x,j)=>j===i?{...x,minutesPlayed:+e.target.value}:x))} style={{ width:48, textAlign:"center", padding:"2px", fontSize:"12px" }} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>

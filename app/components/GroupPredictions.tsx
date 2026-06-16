@@ -182,9 +182,13 @@ export default function GroupPredictions({ player, onUpdate, readonly, allPlayer
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0, flexDirection: "column", minWidth: "60px" }}>
                         {locked && result ? (
-                          <div style={{ textAlign: "center" }}>
-                            <p style={{ fontSize: "9px", fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1px" }}>Final Score</p>
-                            <p style={{ fontSize: "20px", fontWeight: 900, color: "#713f12", lineHeight: 1 }}>{result.home}–{result.away}</p>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                            <span style={{ fontSize: "9px", fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.05em" }}>Final Score</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                              <input className="score-input" type="text" value={result.home} readOnly disabled style={{ background: "#fef3c7", borderColor: "#f59e0b", color: "#92400e", fontWeight: 900 }} />
+                              <span style={{ color: "var(--text-3)", fontSize: "11px" }}>—</span>
+                              <input className="score-input" type="text" value={result.away} readOnly disabled style={{ background: "#fef3c7", borderColor: "#f59e0b", color: "#92400e", fontWeight: 900 }} />
+                            </div>
                           </div>
                         ) : (
                           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
