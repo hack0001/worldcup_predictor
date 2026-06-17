@@ -944,29 +944,74 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 )}
               </div>
 
-              {/* Fantasy squad */}
+              {/* Fantasy squad - editable */}
               <div className="card" style={{ padding: "14px" }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
-                  👕 Fantasy Squad ({(userFantasySquads[viewingUser.id] || []).length}/11 players)
-                </p>
-                {(userFantasySquads[viewingUser.id] || []).length > 0 ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {(userFantasySquads[viewingUser.id] || []).map(name => {
-                      const entry = Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === name));
-                      const pos = entry?.[1]?.players.find(p => p.name === name)?.position;
-                      const posColors: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#22c55e", FWD: "#ef4444" };
-                      return (
-                        <span key={name} style={{ fontSize: "12px", padding: "3px 9px", borderRadius: "99px", background: posColors[pos || "FWD"] + "15", color: posColors[pos || "FWD"], border: `1px solid ${posColors[pos || "FWD"]}33`, fontWeight: 600 }}>
-                          {pos && <span style={{ fontSize: "10px", opacity: 0.8, marginRight: "3px" }}>{pos}</span>}
-                          {name}
-                          {entry && <span style={{ fontSize: "10px", opacity: 0.6, marginLeft: "3px" }}>· {entry[0]}</span>}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No fantasy squad picked yet</p>
-                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <p style={{ fontWeight: 700, fontSize: "13px" }}>
+                    👕 Fantasy Squad ({(userFantasySquads[viewingUser.id] || []).length}/11 players)
+                  </p>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+                  {(userFantasySquads[viewingUser.id] || []).map(name => {
+                    const entry = Object.entries(SQUADS).find(([, s]) => s.players.some(p => p.name === name));
+                    const pos = entry?.[1]?.players.find(p => p.name === name)?.position;
+                    const posColors: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#22c55e", FWD: "#ef4444" };
+                    const isUnknown = !entry;
+                    return (
+                      <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", padding: "3px 8px", borderRadius: "99px", background: isUnknown ? "#fef9c3" : (posColors[pos || "FWD"] + "15"), color: isUnknown ? "#92400e" : posColors[pos || "FWD"], border: `1px solid ${isUnknown ? "#fde047" : (posColors[pos || "FWD"] + "33")}`, fontWeight: 600 }}>
+                        {pos && <span style={{ fontSize: "10px", opacity: 0.8 }}>{pos}</span>}
+                        {name}
+                        {isUnknown && <span style={{ fontSize: "10px" }}>⚠️</span>}
+                        <button onClick={async () => {
+                          const newSquad = (userFantasySquads[viewingUser.id] || []).filter(n => n !== name);
+                          const { supabase } = await import("@/lib/supabase");
+                          const { data: existing } = await supabase.from("fantasy_squads").select("squad").eq("player_id", viewingUser.id).single();
+                          const fullSquad = (existing?.squad as {name:string;position:string;country:string}[] || []).filter(p => p.name !== name);
+                          await supabase.from("fantasy_squads").upsert({ id: viewingUser.id, player_id: viewingUser.id, squad: fullSquad, round: "group", updated_at: new Date().toISOString() });
+                          setUserFantasySquads(prev => ({ ...prev, [viewingUser.id]: newSquad }));
+                        }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.6, fontSize: "12px", padding: "0", lineHeight: 1 }}>×</button>
+                      </span>
+                    );
+                  })}
+                  {(userFantasySquads[viewingUser.id] || []).length === 0 && (
+                    <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No fantasy squad picked yet</p>
+                  )}
+                </div>
+                {/* Add player search */}
+                {(userFantasySquads[viewingUser.id] || []).length < 11 && (() => {
+                  const existing = new Set(userFantasySquads[viewingUser.id] || []);
+                  const allPlayers = Object.entries(SQUADS).flatMap(([country, { players }]) =>
+                    (players as {name:string;position:string}[]).map(p => ({ name: p.name, position: p.position, country }))
+                  ).filter(p => !existing.has(p.name));
+                  return (
+                    <div>
+                      <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "6px" }}>Add player:</p>
+                      <select style={{ fontSize: "12px", padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border)", width: "100%" }}
+                        defaultValue=""
+                        onChange={async e => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const [name, position, country] = val.split("|");
+                          const newEntry = { name, position, country };
+                          const { supabase } = await import("@/lib/supabase");
+                          const { data: existing } = await supabase.from("fantasy_squads").select("squad").eq("player_id", viewingUser.id).single();
+                          const fullSquad = [...(existing?.squad as {name:string;position:string;country:string}[] || []), newEntry];
+                          await supabase.from("fantasy_squads").upsert({ id: viewingUser.id, player_id: viewingUser.id, squad: fullSquad, round: "group", updated_at: new Date().toISOString() });
+                          setUserFantasySquads(prev => ({ ...prev, [viewingUser.id]: [...(prev[viewingUser.id] || []), name] }));
+                          e.target.value = "";
+                        }}>
+                        <option value="">— select player to add —</option>
+                        {["GK","DEF","MID","FWD"].map(pos => (
+                          <optgroup key={pos} label={pos}>
+                            {allPlayers.filter(p => p.position === pos).sort((a,b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name)).map(p => (
+                              <option key={p.name} value={`${p.name}|${p.position}|${p.country}`}>{p.name} ({p.country})</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

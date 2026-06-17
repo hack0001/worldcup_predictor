@@ -289,12 +289,17 @@ export default function App() {
       </div>
       <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} fantasyLocked={adminState.fantasyLocked} />}
-        {fanTab === "board" && <FantasyLeaderboard
-          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
-          squads={fantasySquads}
-          stats={playerStats}
-          currentPlayerId={currentPlayer.id}
-        />}
+        {fanTab === "board" && (() => {
+          // Refresh stats every time board is viewed
+          getAllPlayerStats().then(setPlayerStats);
+          getAllFantasySquads().then(setFantasySquads);
+          return <FantasyLeaderboard
+            players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
+            squads={fantasySquads}
+            stats={playerStats}
+            currentPlayerId={currentPlayer.id}
+          />;
+        })()}
       </div>
     </div>
   );
