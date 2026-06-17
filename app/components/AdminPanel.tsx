@@ -17,20 +17,24 @@ interface Props {
 
 const ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter Finals", "Semi Finals", "Final"];
 
-function QuickStatRow({ player, existingStat, onSave }: {
+function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
   player: { name: string; country: string; position: string };
-  existingStat: PlayerStat | undefined;
+  matchStat: PlayerStat | undefined;
+  matchId: string;
+  matchLabel: string;
   onSave: (s: PlayerStat) => void;
 }) {
-  const [g, setG] = useState(existingStat?.goals ?? 0);
-  const [a, setA] = useState(existingStat?.assists ?? 0);
-  const [y, setY] = useState(existingStat?.yellowCards ?? 0);
-  const [r, setR] = useState(existingStat?.redCards ?? 0);
-  const [sv, setSv] = useState(existingStat?.saves ?? 0);
-  const [m, setM] = useState(existingStat?.minutesPlayed ?? 0);
-  const [cs, setCs] = useState(existingStat?.cleanSheets ?? 0);
+  const [g, setG] = useState(matchStat?.goals ?? 0);
+  const [a, setA] = useState(matchStat?.assists ?? 0);
+  const [y, setY] = useState(matchStat?.yellowCards ?? 0);
+  const [r, setR] = useState(matchStat?.redCards ?? 0);
+  const [sv, setSv] = useState(matchStat?.saves ?? 0);
+  const [m, setM] = useState(matchStat?.minutesPlayed ?? 0);
+  const [cs, setCs] = useState(matchStat?.cleanSheets ?? 0);
   const [saving, setSaving] = useState(false);
-  const isDirty = g !== (existingStat?.goals ?? 0) || a !== (existingStat?.assists ?? 0) || y !== (existingStat?.yellowCards ?? 0) || r !== (existingStat?.redCards ?? 0) || sv !== (existingStat?.saves ?? 0) || m !== (existingStat?.minutesPlayed ?? 0) || cs !== (existingStat?.cleanSheets ?? 0);
+  // Reset when match changes
+  useState(() => { setG(matchStat?.goals??0); setA(matchStat?.assists??0); setY(matchStat?.yellowCards??0); setR(matchStat?.redCards??0); setSv(matchStat?.saves??0); setM(matchStat?.minutesPlayed??0); setCs(matchStat?.cleanSheets??0); });
+  const isDirty = g!==(matchStat?.goals??0)||a!==(matchStat?.assists??0)||y!==(matchStat?.yellowCards??0)||r!==(matchStat?.redCards??0)||sv!==(matchStat?.saves??0)||m!==(matchStat?.minutesPlayed??0)||cs!==(matchStat?.cleanSheets??0);
   const inp = (val: number, set: (n: number) => void, max = 20) => (
     <td style={{ padding: "3px 2px" }}>
       <input type="number" min={0} max={max} value={val} onChange={e => set(Math.max(0, +e.target.value))}
@@ -41,13 +45,13 @@ function QuickStatRow({ player, existingStat, onSave }: {
     <tr style={{ borderBottom: "1px solid var(--border)", background: isDirty ? "var(--green-light)" : "transparent" }}>
       <td style={{ padding: "4px 8px", fontWeight: 600, fontSize: "12px", whiteSpace: "nowrap" }}>
         <span style={{ fontSize: "10px", color: "var(--text-3)", marginRight: 4 }}>{player.position}</span>
-        {player.name}<span style={{ fontSize: "10px", color: "var(--text-3)", marginLeft: 4 }}>({player.country})</span>
+        {player.name}
       </td>
       {inp(g, setG)} {inp(a, setA)} {inp(y, setY, 3)} {inp(r, setR, 1)} {inp(sv, setSv)} {inp(m, setM, 120)} {inp(cs, setCs)}
       <td style={{ padding: "3px 4px" }}>
         <button onClick={async () => {
           setSaving(true);
-          await onSave({ id: existingStat?.id || `${player.name}-${Date.now()}`, playerName: player.name, country: player.country, goals: g, assists: a, yellowCards: y, redCards: r, saves: sv, minutesPlayed: m, cleanSheets: cs, round: "group" });
+          await onSave({ id: matchStat?.id || `${player.name}-${matchId}`, playerName: player.name, country: player.country, goals: g, assists: a, yellowCards: y, redCards: r, saves: sv, minutesPlayed: m, cleanSheets: cs, round: "group", matchId, matchLabel });
           setSaving(false);
         }} style={{ fontSize: "11px", padding: "3px 8px", borderRadius: 5, border: "none", background: isDirty ? "var(--green)" : "var(--border)", color: isDirty ? "white" : "var(--text-3)", cursor: isDirty ? "pointer" : "default", fontWeight: 700 }}>
           {saving ? "…" : "✓"}
@@ -69,6 +73,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   }[]>(null);
   const [squadPlayers, setSquadPlayers] = useState<{name: string; country: string; position: string; pickedBy: string[]}[]>([]);
   const [showSquadList, setShowSquadList] = useState(false);
+  const [selectedMatchForStats, setSelectedMatchForStats] = useState<string>("");
   const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
@@ -804,59 +809,104 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
             )}
           </div>
 
-          {/* Quick-edit stats for squad picks */}
+          {/* Per-match stats entry for squad picks */}
           {(() => {
-            const squadSet = new Map<string, { country: string; position: string; pickedBy: string[] }>();
+            // Build squad player map
+            const squadMap = new Map<string, { country: string; position: string }>();
             users.forEach(u => {
               (userFantasySquads[u.id] || []).forEach(name => {
-                if (!squadSet.has(name)) {
+                if (!squadMap.has(name)) {
                   let country = "Unknown", position = "FWD";
                   for (const [c, { players }] of Object.entries(SQUADS)) {
                     const p = (players as {name:string;position:string}[]).find(p => p.name === name);
                     if (p) { country = c; position = p.position; break; }
                   }
-                  squadSet.set(name, { country, position, pickedBy: [] });
+                  squadMap.set(name, { country, position });
                 }
-                squadSet.get(name)!.pickedBy.push(u.name);
               });
             });
-            const squadList = Array.from(squadSet.entries()).map(([name, v]) => ({
-              name, ...v,
-              stat: stats.find(s => s.playerName === name),
-            })).sort((a,b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
+            const squadList = Array.from(squadMap.entries())
+              .map(([name, v]) => ({ name, ...v }))
+              .sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
             if (!squadList.length) return null;
+
+            // Get completed matches
+            const completedMatches = GROUP_MATCHES.filter(m => {
+              const result = adminState.results?.group?.[m.id];
+              return result?.home !== undefined;
+            });
+
             return (
               <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>⚡ Quick-edit Squad Player Stats</p>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
-                        <th style={{ padding: "6px 8px", textAlign: "left" }}>Player</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center", color: "var(--green)" }}>⚽</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#3b82f6" }}>🅰️</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#f59e0b" }}>🟨</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#ef4444" }}>🟥</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center" }}>Saves</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center" }}>Mins</th>
-                        <th style={{ padding: "6px 4px", textAlign: "center" }}>CS</th>
-                        <th style={{ padding: "6px 4px", width: 40 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {squadList.map(p => {
-                        const [g, setG] = [p.stat?.goals ?? 0, null];
-                        const key = p.name;
-                        return (
-                          <QuickStatRow key={key} player={p} existingStat={p.stat} onSave={async (s) => {
-                            await savePlayerStat(s);
-                            getAllPlayerStats().then(setStats);
-                          }} />
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>⚽ Per-Match Player Stats</p>
+                <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Select a match, then enter stats for each squad player who played. Totals auto-accumulate.</p>
+
+                {/* Match selector */}
+                <div style={{ marginBottom: "12px" }}>
+                  <label className="label">Select Match</label>
+                  <select value={selectedMatchForStats || ""} onChange={e => setSelectedMatchForStats(e.target.value)}
+                    style={{ fontSize: "13px", padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", width: "100%" }}>
+                    <option value="">— pick a match —</option>
+                    {GROUP_MATCHES.map(m => {
+                      const home = typeof m.home === "string" ? m.home : (m.home as {team:string}).team;
+                      const away = typeof m.away === "string" ? m.away : (m.away as {team:string}).team;
+                      const hasResult = !!adminState.results?.group?.[m.id];
+                      return (
+                        <option key={m.id} value={m.id}>
+                          {hasResult ? "✓ " : ""}{home} vs {away} ({m.dateUK})
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
+
+                {selectedMatchForStats && (() => {
+                  const match = GROUP_MATCHES.find(m => m.id === selectedMatchForStats);
+                  if (!match) return null;
+                  const homeTeam = typeof match.home === "string" ? match.home : (match.home as {team:string}).team;
+                  const awayTeam = typeof match.away === "string" ? match.away : (match.away as {team:string}).team;
+                  const matchLabel = `${homeTeam} vs ${awayTeam}`;
+                  // Filter squad to players from these two teams
+                  const matchPlayers = squadList.filter(p => p.country === homeTeam || p.country === awayTeam);
+
+                  if (!matchPlayers.length) return (
+                    <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No fantasy squad players from {homeTeam} or {awayTeam}</p>
+                  );
+
+                  return (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                            <th style={{ padding: "6px 8px", textAlign: "left" }}>Player</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "var(--green)" }}>⚽</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "#3b82f6" }}>🅰️</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "#f59e0b" }}>🟨</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "#ef4444" }}>🟥</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center" }}>Saves</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center" }}>Mins</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center" }}>CS</th>
+                            <th style={{ padding: "6px 4px", width: 40 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matchPlayers.map(p => {
+                            const matchStat = stats.find(s => s.playerName === p.name && s.matchId === selectedMatchForStats);
+                            return (
+                              <QuickStatRow key={p.name} player={p} matchStat={matchStat} matchId={selectedMatchForStats} matchLabel={matchLabel} onSave={async (s) => {
+                                await savePlayerStat(s);
+                                getAllPlayerStats().then(setStats);
+                              }} />
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "8px" }}>
+                        ✓ = saved for this match. Points accumulate across all matches automatically.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

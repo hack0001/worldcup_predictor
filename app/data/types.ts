@@ -73,6 +73,8 @@ export interface PlayerStat {
   saves: number;
   minutesPlayed: number;
   round: string;
+  matchId?: string;       // e.g. "A-0-1"
+  matchLabel?: string;    // e.g. "Mexico vs South Africa"
 }
 
 export interface AdminState {

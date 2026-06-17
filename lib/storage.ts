@@ -126,18 +126,34 @@ export async function getAllPlayerStats(): Promise<PlayerStat[]> {
     cleanSheets: (d.clean_sheets as number) || 0, yellowCards: (d.yellow_cards as number) || 0,
     redCards: (d.red_cards as number) || 0, saves: (d.saves as number) || 0,
     minutesPlayed: (d.minutes_played as number) || 0, round: d.round as string,
+    matchId: d.match_id as string || undefined,
+    matchLabel: d.match_label as string || undefined,
   }));
 }
+
 export async function savePlayerStat(stat: PlayerStat): Promise<void> {
-  const { error: delErr } = await supabase.from("player_stats").delete().eq("player_name", stat.playerName);
-  if (delErr) console.error("Delete error:", delErr);
-  const { error: insErr } = await supabase.from("player_stats").insert({
-    id: stat.id, player_name: stat.playerName, country: stat.country,
-    goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
-    yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
-    minutes_played: stat.minutesPlayed, round: stat.round,
-  });
-  if (insErr) console.error("Insert error:", insErr.message, insErr.details, insErr.code);
+  // Per-match: upsert by player_name + match_id (unique combo)
+  // If no matchId, fall back to deleting all rows for player (legacy behaviour)
+  if (stat.matchId) {
+    const { error } = await supabase.from("player_stats").upsert({
+      id: stat.id, player_name: stat.playerName, country: stat.country,
+      goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
+      yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
+      minutes_played: stat.minutesPlayed, round: stat.round,
+      match_id: stat.matchId, match_label: stat.matchLabel || "",
+    }, { onConflict: "player_name,match_id" });
+    if (error) console.error("Upsert error:", error.message, error.code);
+  } else {
+    const { error: delErr } = await supabase.from("player_stats").delete().eq("player_name", stat.playerName);
+    if (delErr) console.error("Delete error:", delErr);
+    const { error: insErr } = await supabase.from("player_stats").insert({
+      id: stat.id, player_name: stat.playerName, country: stat.country,
+      goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
+      yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
+      minutes_played: stat.minutesPlayed, round: stat.round,
+    });
+    if (insErr) console.error("Insert error:", insErr.message, insErr.code);
+  }
 }
 export async function deletePlayerStat(id: string): Promise<void> {
   await supabase.from("player_stats").delete().eq("id", id);
