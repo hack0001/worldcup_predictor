@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Player, FantasyPlayer, FantasySquad as FantasySquadType } from "@/app/data/types";
+import { Player, FantasyPlayer, FantasySquad as FantasySquadType, PlayerStat, FANTASY_POINTS } from "@/app/data/types";
 import { SQUADS, TEAM_FLAGS } from "@/app/data/worldcup";
-import { getFantasySquad, saveFantasySquad } from "@/lib/storage";
+import { getFantasySquad, saveFantasySquad, getAllPlayerStats } from "@/lib/storage";
 
 interface Props { player: Player; fantasyLocked?: boolean; }
 
@@ -29,7 +29,7 @@ function FlagImg({ country, size = 18 }: { country: string; size?: number }) {
 }
 
 // ── Pitch View ────────────────────────────────────────────
-function PlayerCard({ fp, onRemove }: { fp: FantasyPlayer; onRemove?: () => void }) {
+function PlayerCard({ fp, onRemove, points }: { fp: FantasyPlayer; onRemove?: () => void; points?: { pts: number; breakdown: string } }) {
   const code = TEAM_FLAGS[fp.country];
   const shirtColor = POSITION_COLORS[fp.position];
   const shortName = fp.name.split(" ").pop() || fp.name;
@@ -66,6 +66,12 @@ function PlayerCard({ fp, onRemove }: { fp: FantasyPlayer; onRemove?: () => void
       <div style={{ fontSize: 9, fontWeight: 800, color: "white", background: shirtColor, padding: "1px 5px", borderRadius: 3 }}>
         {fp.position}
       </div>
+      {/* Points badge */}
+      {points !== undefined && (
+        <div title={points.breakdown} style={{ fontSize: 10, fontWeight: 900, color: points.pts > 0 ? "#15803d" : points.pts < 0 ? "#ef4444" : "rgba(255,255,255,0.6)", background: points.pts !== 0 ? "white" : "rgba(255,255,255,0.15)", padding: "1px 6px", borderRadius: 3, minWidth: 24, textAlign: "center" }}>
+          {points.pts > 0 ? `+${points.pts}` : points.pts === 0 ? "–" : points.pts}
+        </div>
+      )}
     </div>
   );
 }
@@ -82,14 +88,14 @@ function EmptySlot({ position }: { position: FantasyPlayer["position"] }) {
   );
 }
 
-function PitchView({ squad, onRemove, positionLimits }: { squad: FantasyPlayer[]; onRemove: (name: string) => void; positionLimits: { GK: number; DEF: number; MID: number; FWD: number; label?: string } }) {
+function PitchView({ squad, onRemove, positionLimits, getPlayerPoints }: { squad: FantasyPlayer[]; onRemove: (name: string) => void; positionLimits: { GK: number; DEF: number; MID: number; FWD: number; label?: string }; getPlayerPoints?: (fp: FantasyPlayer) => { pts: number; breakdown: string } }) {
   const byPos: Record<string, FantasyPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
 
   const Row = ({ pos }: { pos: FantasyPlayer["position"] }) => (
     <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-start", padding: "10px 4px" }}>
       {byPos[pos].length > 0
-        ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} />)
+        ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} points={getPlayerPoints ? getPlayerPoints(p) : undefined} />)
         : Array.from({ length: positionLimits[pos] || 0 }).map((_, i) => <EmptySlot key={i} position={pos} />)
       }
     </div>
@@ -122,6 +128,7 @@ function PitchView({ squad, onRemove, positionLimits }: { squad: FantasyPlayer[]
 // ── Main Component ─────────────────────────────────────────
 export default function FantasySquadPicker({ player, fantasyLocked = false }: Props) {
   const [squad, setSquad] = useState<FantasyPlayer[]>([]);
+  const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [formation, setFormation] = useState(DEFAULT_FORMATION);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,11 +144,30 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
       if ((existing as { formation?: string })?.formation) setFormation((existing as { formation?: string }).formation!);
       setLoading(false);
     });
+    getAllPlayerStats().then(setPlayerStats);
   }, [player.id]);
 
   const POSITION_LIMITS = { GK: 1, ...FORMATIONS[formation] };
-  // Locked if admin locked AND squad is complete (11 players)
   const isLocked = fantasyLocked && squad.length >= 11;
+
+  const getPlayerPoints = (fp: FantasyPlayer): { pts: number; breakdown: string } => {
+    const s = playerStats.find(s => s.playerName === fp.name);
+    if (!s) return { pts: 0, breakdown: "" };
+    let pts = 0;
+    const parts: string[] = [];
+    const goalPts = fp.position === "FWD" ? FANTASY_POINTS.GOAL_FWD : fp.position === "MID" ? FANTASY_POINTS.GOAL_MID : FANTASY_POINTS.GOAL_DEF;
+    if (s.goals) { pts += s.goals * goalPts; parts.push(`${s.goals}⚽+${s.goals * goalPts}`); }
+    if (s.assists) { pts += s.assists * FANTASY_POINTS.ASSIST; parts.push(`${s.assists}🅰️+${s.assists * FANTASY_POINTS.ASSIST}`); }
+    if ((fp.position === "GK" || fp.position === "DEF") && s.cleanSheets) { pts += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF; parts.push(`${s.cleanSheets}🧤+${s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF}`); }
+    if (s.yellowCards) { pts += s.yellowCards * FANTASY_POINTS.YELLOW_CARD; parts.push(`${s.yellowCards}🟨${s.yellowCards * FANTASY_POINTS.YELLOW_CARD}`); }
+    if (s.redCards) { pts += s.redCards * FANTASY_POINTS.RED_CARD; parts.push(`${s.redCards}🟥${s.redCards * FANTASY_POINTS.RED_CARD}`); }
+    if (fp.position === "GK" && s.saves) { const sp = Math.floor(s.saves / 3) * FANTASY_POINTS.SAVE_SET; pts += sp; parts.push(`${s.saves}saves+${sp}`); }
+    if (s.minutesPlayed >= 60) { pts += FANTASY_POINTS.PLAYED_60; parts.push(`mins+${FANTASY_POINTS.PLAYED_60}`); }
+    else if (s.minutesPlayed > 0) { pts += FANTASY_POINTS.PLAYED_SUB_60; parts.push(`mins+${FANTASY_POINTS.PLAYED_SUB_60}`); }
+    return { pts, breakdown: parts.join(" ") };
+  };
+
+  const totalPoints = squad.reduce((sum, fp) => sum + getPlayerPoints(fp).pts, 0);
 
   const persist = async (newSquad: FantasyPlayer[], newFormation = formation) => {
     setSaving(true);
@@ -249,7 +275,20 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
       {/* SQUAD PITCH VIEW */}
       {activeTab === "squad" && (
         <div>
-          <PitchView squad={squad} onRemove={removePlayer} positionLimits={POSITION_LIMITS} />
+          {/* Total points banner */}
+          {playerStats.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "linear-gradient(135deg,#15803d,#166534)", borderRadius: "10px", marginBottom: "10px" }}>
+              <div>
+                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total Fantasy Points</p>
+                <p style={{ fontSize: "28px", fontWeight: 900, color: "white", lineHeight: 1 }}>{totalPoints}</p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>{squad.filter(fp => getPlayerPoints(fp).pts > 0).length} players scoring</p>
+                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>{squad.length}/11 selected</p>
+              </div>
+            </div>
+          )}
+          <PitchView squad={squad} onRemove={removePlayer} positionLimits={POSITION_LIMITS} getPlayerPoints={getPlayerPoints} />
           
           {squad.length === 0 && (
             <div style={{ textAlign: "center", marginTop: "16px" }}>

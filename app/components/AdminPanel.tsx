@@ -17,6 +17,46 @@ interface Props {
 
 const ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter Finals", "Semi Finals", "Final"];
 
+function QuickStatRow({ player, existingStat, onSave }: {
+  player: { name: string; country: string; position: string };
+  existingStat: PlayerStat | undefined;
+  onSave: (s: PlayerStat) => void;
+}) {
+  const [g, setG] = useState(existingStat?.goals ?? 0);
+  const [a, setA] = useState(existingStat?.assists ?? 0);
+  const [y, setY] = useState(existingStat?.yellowCards ?? 0);
+  const [r, setR] = useState(existingStat?.redCards ?? 0);
+  const [sv, setSv] = useState(existingStat?.saves ?? 0);
+  const [m, setM] = useState(existingStat?.minutesPlayed ?? 0);
+  const [cs, setCs] = useState(existingStat?.cleanSheets ?? 0);
+  const [saving, setSaving] = useState(false);
+  const isDirty = g !== (existingStat?.goals ?? 0) || a !== (existingStat?.assists ?? 0) || y !== (existingStat?.yellowCards ?? 0) || r !== (existingStat?.redCards ?? 0) || sv !== (existingStat?.saves ?? 0) || m !== (existingStat?.minutesPlayed ?? 0) || cs !== (existingStat?.cleanSheets ?? 0);
+  const inp = (val: number, set: (n: number) => void, max = 20) => (
+    <td style={{ padding: "3px 2px" }}>
+      <input type="number" min={0} max={max} value={val} onChange={e => set(Math.max(0, +e.target.value))}
+        style={{ width: 38, textAlign: "center", padding: "3px 2px", fontSize: "12px", border: "1px solid var(--border)", borderRadius: 4 }} />
+    </td>
+  );
+  return (
+    <tr style={{ borderBottom: "1px solid var(--border)", background: isDirty ? "var(--green-light)" : "transparent" }}>
+      <td style={{ padding: "4px 8px", fontWeight: 600, fontSize: "12px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "10px", color: "var(--text-3)", marginRight: 4 }}>{player.position}</span>
+        {player.name}<span style={{ fontSize: "10px", color: "var(--text-3)", marginLeft: 4 }}>({player.country})</span>
+      </td>
+      {inp(g, setG)} {inp(a, setA)} {inp(y, setY, 3)} {inp(r, setR, 1)} {inp(sv, setSv)} {inp(m, setM, 120)} {inp(cs, setCs)}
+      <td style={{ padding: "3px 4px" }}>
+        <button onClick={async () => {
+          setSaving(true);
+          await onSave({ id: existingStat?.id || `${player.name}-${Date.now()}`, playerName: player.name, country: player.country, goals: g, assists: a, yellowCards: y, redCards: r, saves: sv, minutesPlayed: m, cleanSheets: cs, round: "group" });
+          setSaving(false);
+        }} style={{ fontSize: "11px", padding: "3px 8px", borderRadius: 5, border: "none", background: isDirty ? "var(--green)" : "var(--border)", color: isDirty ? "white" : "var(--text-3)", cursor: isDirty ? "pointer" : "default", fontWeight: 700 }}>
+          {saving ? "…" : "✓"}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
   const [authenticated] = useState(true); // Auth handled by page-level login
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill">("results");
@@ -763,6 +803,63 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
               </div>
             )}
           </div>
+
+          {/* Quick-edit stats for squad picks */}
+          {(() => {
+            const squadSet = new Map<string, { country: string; position: string; pickedBy: string[] }>();
+            users.forEach(u => {
+              (userFantasySquads[u.id] || []).forEach(name => {
+                if (!squadSet.has(name)) {
+                  let country = "Unknown", position = "FWD";
+                  for (const [c, { players }] of Object.entries(SQUADS)) {
+                    const p = (players as {name:string;position:string}[]).find(p => p.name === name);
+                    if (p) { country = c; position = p.position; break; }
+                  }
+                  squadSet.set(name, { country, position, pickedBy: [] });
+                }
+                squadSet.get(name)!.pickedBy.push(u.name);
+              });
+            });
+            const squadList = Array.from(squadSet.entries()).map(([name, v]) => ({
+              name, ...v,
+              stat: stats.find(s => s.playerName === name),
+            })).sort((a,b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
+            if (!squadList.length) return null;
+            return (
+              <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
+                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>⚡ Quick-edit Squad Player Stats</p>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                        <th style={{ padding: "6px 8px", textAlign: "left" }}>Player</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center", color: "var(--green)" }}>⚽</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#3b82f6" }}>🅰️</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#f59e0b" }}>🟨</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center", color: "#ef4444" }}>🟥</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center" }}>Saves</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center" }}>Mins</th>
+                        <th style={{ padding: "6px 4px", textAlign: "center" }}>CS</th>
+                        <th style={{ padding: "6px 4px", width: 40 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {squadList.map(p => {
+                        const [g, setG] = [p.stat?.goals ?? 0, null];
+                        const key = p.name;
+                        return (
+                          <QuickStatRow key={key} player={p} existingStat={p.stat} onSave={async (s) => {
+                            await savePlayerStat(s);
+                            getAllPlayerStats().then(setStats);
+                          }} />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="card" style={{ padding: "20px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "16px" }}>Add Player Performance</p>
