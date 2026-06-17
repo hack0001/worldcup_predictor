@@ -199,9 +199,17 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
       redCards: parseInt(newStat.redCards) || 0, saves: parseInt(newStat.saves) || 0,
       minutesPlayed: parseInt(newStat.minutesPlayed) || 0, round: newStat.round,
     };
-    await savePlayerStat(stat);
-    setStats([...stats, stat]);
-    setNewStat({ ...newStat, playerName: "", country: "", goals: "0", assists: "0", cleanSheets: "0", yellowCards: "0", redCards: "0", saves: "0", minutesPlayed: "90" });
+    try {
+      await savePlayerStat(stat);
+      getAllPlayerStats().then(freshStats => {
+        setStats(freshStats);
+        const saved = freshStats.find(s => s.playerName === stat.playerName);
+        if (!saved) alert(`⚠️ Save may have failed — ${stat.playerName} not found after save. Check browser console for errors.`);
+      });
+      setNewStat({ ...newStat, playerName: "", country: "", goals: "0", assists: "0", cleanSheets: "0", yellowCards: "0", redCards: "0", saves: "0", minutesPlayed: "90" });
+    } catch (e) {
+      alert(`Save failed: ${e}`);
+    }
   };
 
   const removeStat = async (id: string) => {

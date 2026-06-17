@@ -129,14 +129,15 @@ export async function getAllPlayerStats(): Promise<PlayerStat[]> {
   }));
 }
 export async function savePlayerStat(stat: PlayerStat): Promise<void> {
-  // Delete any existing row for this player first to avoid duplicates
-  await supabase.from("player_stats").delete().eq("player_name", stat.playerName);
-  await supabase.from("player_stats").insert({
+  const { error: delErr } = await supabase.from("player_stats").delete().eq("player_name", stat.playerName);
+  if (delErr) console.error("Delete error:", delErr);
+  const { error: insErr } = await supabase.from("player_stats").insert({
     id: stat.id, player_name: stat.playerName, country: stat.country,
     goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
     yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
     minutes_played: stat.minutesPlayed, round: stat.round,
   });
+  if (insErr) console.error("Insert error:", insErr.message, insErr.details, insErr.code);
 }
 export async function deletePlayerStat(id: string): Promise<void> {
   await supabase.from("player_stats").delete().eq("id", id);
