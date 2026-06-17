@@ -500,6 +500,24 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
             </div>
             {showSquadList && squadPlayers.length > 0 && (
               <div style={{ marginTop: "12px", overflowX: "auto" }}>
+                {/* Unknown / unmatched players warning */}
+                {(() => {
+                  const unknowns = squadPlayers.filter(p => p.country === "Unknown");
+                  if (!unknowns.length) return null;
+                  return (
+                    <div style={{ marginBottom: "10px", padding: "10px 12px", background: "#fef9c3", borderRadius: "8px", border: "1px solid #fde047" }}>
+                      <p style={{ fontWeight: 700, fontSize: "12px", color: "#92400e", marginBottom: "6px" }}>⚠️ {unknowns.length} unrecognised player{unknowns.length!==1?"s":""} — not in SQUADS data</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {unknowns.map(p => (
+                          <span key={p.name} style={{ fontSize: "11px", background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: "99px", padding: "2px 8px" }}>
+                            {p.name} <span style={{ color: "#92400e" }}>({p.pickedBy.join(", ")})</span>
+                          </span>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: "11px", color: "#92400e", marginTop: "6px" }}>These names don't match any player in the master squad list. They may be typos or duplicates. Go to Admin → Users → View → Fantasy Squad to fix a specific user's picks.</p>
+                    </div>
+                  );
+                })()}
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
@@ -511,9 +529,12 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   </thead>
                   <tbody>
                     {squadPlayers.map(p => (
-                      <tr key={p.name} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{p.name}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--text-2)" }}>{p.country}</td>
+                      <tr key={p.name} style={{ borderBottom: "1px solid var(--border)", background: p.country === "Unknown" ? "#fffbeb" : "transparent" }}>
+                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>
+                          {p.name}
+                          {p.country === "Unknown" && <span style={{ fontSize: "9px", color: "#92400e", marginLeft: "4px" }}>⚠️</span>}
+                        </td>
+                        <td style={{ padding: "6px 10px", color: p.country === "Unknown" ? "#92400e" : "var(--text-2)" }}>{p.country}</td>
                         <td style={{ padding: "6px 8px", textAlign: "center" }}>
                           <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "3px", background: ({GK:"#fef3c7",DEF:"#dbeafe",MID:"#dcfce7",FWD:"#fee2e2"} as Record<string,string>)[p.position]||"var(--surface2)", color: ({GK:"#92400e",DEF:"#1e40af",MID:"#166534",FWD:"#991b1b"} as Record<string,string>)[p.position]||"var(--text)" }}>{p.position}</span>
                         </td>

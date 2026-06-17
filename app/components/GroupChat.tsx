@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Player } from "@/app/data/types";
 import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
@@ -201,7 +201,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0, overflowAnchor: "none" as React.CSSProperties["overflowAnchor"] }}>
+      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0 }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
