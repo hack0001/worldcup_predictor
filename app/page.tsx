@@ -1,396 +1,271 @@
-"use client";
-import { useState, useEffect } from "react";
-import { Player, AdminState } from "@/app/data/types";
-import { getAdminState, getPlayers } from "@/lib/storage";
-import { League, getLeaguesByIds, getPlayersInLeague } from "@/lib/storage";
+'use client'
 
-import SignUp from "@/app/components/SignUp";
-import LeagueSelector from "@/app/components/LeagueSelector";
-import HomeScreen from "@/app/components/HomeScreen";
-import GroupPredictions from "@/app/components/GroupPredictions";
-import KnockoutPredictions from "@/app/components/KnockoutPredictions";
-import Leaderboard from "@/app/components/Leaderboard";
-import GroupStandings from "@/app/components/GroupStandings";
-import TeamInfo from "@/app/components/TeamInfo";
-import GroupChat from "@/app/components/GroupChat";
-import { PollFeed } from "@/app/components/Poll";
-import WorldCupQuiz from "@/app/components/WorldCupQuiz";
-import FixturesView from "@/app/components/FixturesView";
-import { AvatarDisplay } from "@/app/components/AvatarPicker";
-import FantasySquadPicker from "@/app/components/FantasySquad";
-import FantasyLeaderboard from "@/app/components/FantasyLeaderboard";
-import AdminPanel from "@/app/components/AdminPanel";
-import { supabase } from "@/lib/supabase";
-import { getAllPlayerStats, getAllFantasySquads } from "@/lib/storage";
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Play, Plus, Zap, Clock, ChevronRight, Star } from 'lucide-react'
+import { getPrioritySession, getSessions, setPrioritySession } from '@/lib/supabase'
+import type { WorkflowSession } from '@/types'
+import { sounds } from '@/lib/sounds'
 
-type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz" | "fixtures";
-type PredTab = "groups" | "knockout" | "board" | "standings" | "teams" | "chat" | "polls";
-type FanTab = "squad" | "board";
+const FOCUS_QUOTES = [
+  { quote: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { quote: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
+  { quote: "One task. Full attention. Ship it.", author: "" },
+  { quote: "Small daily improvements are the key to staggering long-term results.", author: "Robin Sharma" },
+  { quote: "The quality of your output is determined by the quality of your focus.", author: "" },
+  { quote: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+  { quote: "Energy flows where attention goes.", author: "" },
+  { quote: "Do the hard task first. Your future self will thank you.", author: "" },
+]
 
-export default function App() {
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
-  const [currentLeague, setCurrentLeague] = useState<League | null>(null);
-  const [leaguePlayers, setLeaguePlayers] = useState<Player[]>([]);
-  const [fantasySquads, setFantasySquads] = useState<Awaited<ReturnType<typeof getAllFantasySquads>>>([]);
-  const [adminState, setAdminState] = useState<AdminState>({
-    isAdmin: false, results: { group: {}, knockout: {} },
-    topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "",
-    predictionsLocked: false, lockTime: null, fantasyLocked: false, bonusLocked: false,
-  });
-  const [playerStats, setPlayerStats] = useState<Awaited<ReturnType<typeof getAllPlayerStats>>>([]);
-  const [section, setSection] = useState<Section>("home");
-  const [predTab, setPredTab] = useState<PredTab>("board");
-  const [unreadChat, setUnreadChat] = useState(false);
-  const [fanTab, setFanTab] = useState<FanTab>("squad");
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
-  // Check for unread messages when not on chat tab
+function getDayQuote() {
+  const idx = new Date().getDate() % FOCUS_QUOTES.length
+  return FOCUS_QUOTES[idx]
+}
+
+export default function HomePage() {
+  const router = useRouter()
+  const [prioritySession, setPrioritySession_] = useState<WorkflowSession | null>(null)
+  const [sessions, setSessions] = useState<WorkflowSession[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabaseError, setSupabaseError] = useState(false)
+  const quote = getDayQuote()
+
   useEffect(() => {
-    if (section !== "predictions" || predTab === "chat") { setUnreadChat(false); return; }
-    const lastRead = localStorage.getItem(`chat_read_${currentPlayer?.id}`);
-    const checkUnread = async () => {
-      const { data } = await supabase.from("messages").select("id").order("created_at", { ascending: false }).limit(1);
-      if (data?.[0] && data[0].id !== lastRead) setUnreadChat(true);
-    };
-    checkUnread();
-    const interval = setInterval(checkUnread, 30000);
-    return () => clearInterval(interval);
-  }, [section, predTab, currentPlayer?.id]);
-  const [adminClicks, setAdminClicks] = useState(0);
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Load persisted session
-  useEffect(() => {
-    const saved = localStorage.getItem("wc26_player");
-    const savedLeague = localStorage.getItem("wc26_league");
-    if (saved) {
+    async function load() {
       try {
-        const p = JSON.parse(saved) as Player;
-        // Always re-fetch from DB to get fresh leagueIds
-        import("@/lib/storage").then(({ getPlayerByEmail }) => {
-          getPlayerByEmail(p.email).then(fresh => {
-            const player = fresh || p;
-            setCurrentPlayer(player);
-            localStorage.setItem("wc26_player", JSON.stringify(player));
-            if (savedLeague) {
-              const l = JSON.parse(savedLeague) as League;
-              setCurrentLeague(l);
-              setSection("home");
-            }
-            setLoading(false);
-          });
-        });
+        const [priority, all] = await Promise.all([getPrioritySession(), getSessions()])
+        setPrioritySession_(priority)
+        setSessions(all ?? [])
       } catch {
-        setLoading(false);
+        setSupabaseError(true)
+      } finally {
+        setLoading(false)
       }
+    }
+    load()
+  }, [])
+
+  function handleStart() {
+    sounds.playClick()
+    if (prioritySession) {
+      router.push(`/workflow/${prioritySession.id}/focus`)
+    } else if (sessions.length > 0) {
+      router.push(`/workflow/${sessions[0].id}`)
     } else {
-      setLoading(false);
+      router.push('/workflows')
     }
-  }, []);
+  }
 
-  // Load league players + admin state when league changes
-  useEffect(() => {
-    if (!currentLeague) return;
-    getPlayersInLeague(currentLeague.id).then(setLeaguePlayers);
-    getAdminState().then(s => setAdminState(s));
-    getAllPlayerStats().then(setPlayerStats);
-    getAllFantasySquads().then(setFantasySquads);
-  }, [currentLeague?.id]);
-
-  const handlePlayerSaved = (p: Player) => {
-    setCurrentPlayer(p);
-    localStorage.setItem("wc26_player", JSON.stringify(p));
-    // If player has leagues, show league selector; else show league selector for first time
-    setSection("leagueSwitch");
-  };
-
-  const handleLeagueSelected = (p: Player, l: League) => {
-    setCurrentPlayer(p);
-    setCurrentLeague(l);
-    localStorage.setItem("wc26_player", JSON.stringify(p));
-    localStorage.setItem("wc26_league", JSON.stringify(l));
-    setSection("home");
-  };
-
-  const [adminPwInput, setAdminPwInput] = useState("");
-  const [adminPwError, setAdminPwError] = useState(false);
-
-  const handleLogout = () => {
-    localStorage.removeItem("wc26_player");
-    localStorage.removeItem("wc26_league");
-    setCurrentPlayer(null);
-    setCurrentLeague(null);
-    setSection("home");
-    setShowAdmin(false);
-    setAdminClicks(0);
-  };
-
-  const handleAdminClick = () => {
-    const next = adminClicks + 1;
-    setAdminClicks(next);
-    if (next >= 5) {
-      setSection("adminLogin");
-      setAdminClicks(0);
+  async function handleSetPriority(session: WorkflowSession) {
+    sounds.playClick()
+    try {
+      await setPrioritySession(session.id)
+      setPrioritySession_(session)
+    } catch (e) {
+      console.error(e)
     }
-  };
+  }
 
-  const handleAdminLogin = () => {
-    if (adminPwInput === "worldcup2026") {
-      setShowAdmin(true);
-      setSection("admin");
-      setAdminPwInput("");
-      setAdminPwError(false);
-    } else {
-      setAdminPwError(true);
-    }
-  };
-
-  const navTo = (s: Section) => {
-    if (s === "leagueSwitch") setSection("leagueSwitch");
-    else setSection(s);
-  };
-
-  const updatePlayer = (p: Player) => {
-    setCurrentPlayer(p);
-    localStorage.setItem("wc26_player", JSON.stringify(p));
-    // Refresh league players
-    if (currentLeague) getPlayersInLeague(currentLeague.id).then(setLeaguePlayers);
-  };
-
-  const NavBar = ({ back, tabs, active, onTab }: { back?: () => void; tabs: {id: string; label: string; emoji: string}[]; active: string; onTab: (id: string) => void }) => (
-    <div style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--bg)", borderBottom: "1px solid var(--border)", marginBottom: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "4px", padding: "0 4px", overflowX: "auto" }}>
-        {back && <button onClick={back} className="btn-ghost" style={{ fontSize: "13px", flexShrink: 0, padding: "8px 10px" }}>← Home</button>}
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => onTab(t.id)} className={`tab ${active === t.id ? "active" : ""}`} style={{ flexShrink: 0 }}>{t.emoji} {t.label}</button>
-        ))}
-      </div>
-    </div>
-  );
-
-  if (loading) return null;
-
-  // Not logged in
-  if (!currentPlayer) return (
-    <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
-      <SignUp onComplete={handlePlayerSaved} />
-    </div>
-  );
-
-  // No league yet — show selector
-  if (!currentLeague || section === "leagueSwitch") return (
-    <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
-  );
-
-  // Home
-  if (section === "home") return (
-    <HomeScreen
-      player={currentPlayer}
-      league={currentLeague}
-      onNav={navTo}
-      onUpdate={updatePlayer}
-      onLogout={handleLogout}
-      adminClickCount={adminClicks}
-      onAdminClick={handleAdminClick}
-    />
-  );
-
-  const confirmedTeams = Object.fromEntries(
-    Object.entries(adminState.results.knockout || {}).map(([id, r]) => [id, { home: r.homeTeam || "", away: r.awayTeam || "" }])
-  );
-
-  const PRED_TABS = [
-    { id: "board", label: "Leaderboard", emoji: "🏆" },
-    { id: "groups", label: "Groups", emoji: "🏟️" },
-    { id: "chat", label: "Chat", emoji: "💬" },
-    { id: "knockout", label: "Knockouts", emoji: "⚔️" },
-    { id: "standings", label: "Standings", emoji: "📊" },
-    { id: "teams", label: "Teams", emoji: "📋" },
-    { id: "polls", label: "Polls", emoji: "📊" },
-  ];
-
-  const FAN_TABS = [
-    { id: "squad", label: "My Squad", emoji: "👕" },
-    { id: "board", label: "Leaderboard", emoji: "⭐" },
-  ];
-
-  // Predictions section
-  if (section === "predictions") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+  return (
+    <main className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #15803d 0%, #166534 100%)", padding: "16px 16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>⚽ Predictions</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{currentLeague.name}</p>
-          </div>
-          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
+      <div className="flex items-center justify-between px-8 py-6">
+        <div className="flex items-center gap-2">
+          <Zap size={20} style={{ color: 'var(--cyan)' }} />
+          <span className="font-bold text-lg tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            FlowState
+          </span>
         </div>
-        {/* Tabs inside header */}
-        <div style={{ display: "flex", gap: "2px", overflowX: "auto", paddingBottom: "0" }}>
-          {PRED_TABS.map(t => (
-            <button key={t.id} onClick={() => { setPredTab(t.id as PredTab); if (t.id === "chat") setUnreadChat(false); }} style={{
-              padding: "8px 12px", fontSize: "12px", fontWeight: predTab === t.id ? 800 : 500,
-              border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
-              background: predTab === t.id ? "var(--bg)" : "transparent",
-              color: predTab === t.id ? "var(--green)" : "rgba(255,255,255,0.7)",
-              borderBottom: predTab === t.id ? "3px solid var(--green)" : "3px solid transparent",
-              position: "relative",
-            }}>
-              {t.emoji} {t.label}
-              {t.id === "chat" && unreadChat && (
-                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid white" }} />
-              )}
+        <button
+          onClick={() => { sounds.playClick(); router.push('/workflows') }}
+          className="btn btn-ghost flex items-center gap-2 text-sm"
+        >
+          <Plus size={16} />
+          New Workflow
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 pb-16">
+        {/* Greeting */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12"
+        >
+          <p className="text-lg mb-1" style={{ color: 'var(--text-secondary)' }}>
+            {getGreeting()} 👋
+          </p>
+          <h1 className="text-5xl font-black tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
+            Ready to{' '}
+            <span className="text-glow-cyan" style={{ color: 'var(--cyan)' }}>
+              create?
+            </span>
+          </h1>
+          <p className="text-base max-w-sm mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            {loading ? '...' : supabaseError
+              ? 'Connect Supabase to save your sessions'
+              : prioritySession
+              ? `Your priority: "${prioritySession.title}"`
+              : sessions.length > 0
+              ? 'Select a workflow to continue or start something new'
+              : 'Start your first workflow to get going'}
+          </p>
+        </motion.div>
+
+        {/* Big START Button */}
+        {!supabaseError && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2, type: 'spring', bounce: 0.4 }}
+            className="mb-12"
+          >
+            <button
+              onClick={handleStart}
+              className="relative group"
+              style={{ outline: 'none', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              {/* Glow ring */}
+              <div
+                className="absolute inset-0 rounded-full animate-pulse-glow"
+                style={{
+                  background: 'radial-gradient(circle, rgba(0,212,255,0.15) 0%, transparent 70%)',
+                  transform: 'scale(1.5)',
+                }}
+              />
+              <div
+                className="relative flex items-center justify-center w-40 h-40 rounded-full font-black text-2xl tracking-wide glow-cyan transition-all duration-200 group-hover:scale-105 group-active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, var(--cyan), #0099cc)',
+                  color: '#000',
+                }}
+              >
+                <Play size={40} fill="currentColor" />
+              </div>
             </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: "16px 16px 32px" }}>
-        {predTab === "board" && <Leaderboard
-          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
-          adminState={adminState}
-          currentPlayerId={currentPlayer.id}
-        />}
-        {predTab === "groups" && <GroupPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} allPlayers={leaguePlayers} adminState={adminState} />}
-        {predTab === "knockout" && <KnockoutPredictions player={currentPlayer} onUpdate={updatePlayer} readonly={adminState.predictionsLocked} confirmedTeams={confirmedTeams} />}
-        {predTab === "standings" && <GroupStandings adminState={adminState} />}
-        {predTab === "teams" && <TeamInfo />}
-        {predTab === "chat" && <GroupChat currentPlayer={currentPlayer} allPlayers={leaguePlayers} isAdmin={showAdmin} leagueId={currentLeague.id} />}
-        {predTab === "polls" && <PollFeed currentPlayer={currentPlayer} allPlayers={leaguePlayers} leagueId={currentLeague.id} />}
-      </div>
-    </div>
-  );
+            <p className="text-center mt-4 text-sm font-semibold tracking-widest uppercase"
+              style={{ color: 'var(--text-secondary)' }}>
+              {prioritySession ? 'Continue Focus' : sessions.length > 0 ? 'Pick a Session' : 'Start Here'}
+            </p>
+          </motion.div>
+        )}
 
-  // Fantasy section
-  if (section === "fantasy") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)", padding: "16px 16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>👕 Fantasy</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{currentLeague.name}</p>
-          </div>
-          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
-        </div>
-        <div style={{ display: "flex", gap: "2px", overflowX: "auto" }}>
-          {FAN_TABS.map(t => (
-            <button key={t.id} onClick={() => setFanTab(t.id as FanTab)} style={{
-              padding: "8px 16px", fontSize: "12px", fontWeight: fanTab === t.id ? 800 : 500,
-              border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
-              background: fanTab === t.id ? "var(--bg)" : "transparent",
-              color: fanTab === t.id ? "#3b82f6" : "rgba(255,255,255,0.7)",
-              borderBottom: fanTab === t.id ? "3px solid #3b82f6" : "3px solid transparent",
-            }}>{t.emoji} {t.label}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: "16px 16px 32px" }}>
-        {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} fantasyLocked={adminState.fantasyLocked} />}
-        {fanTab === "board" && (() => {
-          // Refresh stats every time board is viewed
-          getAllPlayerStats().then(setPlayerStats);
-          getAllFantasySquads().then(setFantasySquads);
-          return <FantasyLeaderboard
-            players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
-            squads={fantasySquads}
-            stats={playerStats}
-            currentPlayerId={currentPlayer.id}
-          />;
-        })()}
-      </div>
-    </div>
-  );
+        {/* Supabase setup notice */}
+        {supabaseError && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card p-6 max-w-md text-center mb-8"
+          >
+            <p className="font-bold mb-2" style={{ color: 'var(--amber)' }}>⚠️ Supabase Not Connected</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Copy <code className="px-1 rounded" style={{ background: 'var(--surface)', color: 'var(--cyan)' }}>.env.local.example</code>{' '}
+              to <code className="px-1 rounded" style={{ background: 'var(--surface)', color: 'var(--cyan)' }}>.env.local</code>{' '}
+              and add your Supabase credentials to enable sessions.
+            </p>
+            <button
+              onClick={() => { sounds.playClick(); router.push('/workflows') }}
+              className="btn btn-primary text-sm"
+            >
+              Browse Workflows (preview only)
+            </button>
+          </motion.div>
+        )}
 
-  // Fixtures
-  if (section === "fixtures") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      <div style={{ background: "linear-gradient(135deg, #0369a1, #0284c7)", padding: "16px 16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <p style={{ fontWeight: 800, fontSize: "16px", color: "white", flex: 1 }}>📅 Upcoming Fixtures</p>
-        </div>
-      </div>
-      <div style={{ padding: "16px" }}>
-        <FixturesView player={currentPlayer} />
-      </div>
-    </div>
-  );
+        {/* Sessions list */}
+        {!supabaseError && !loading && sessions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="w-full max-w-lg"
+          >
+            <p className="text-xs font-semibold tracking-widest uppercase mb-3"
+              style={{ color: 'var(--text-muted)' }}>
+              Active Sessions
+            </p>
+            <div className="flex flex-col gap-2">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="card card-hover flex items-center gap-3 p-4 cursor-pointer"
+                  onClick={() => { sounds.playClick(); router.push(`/workflow/${session.id}`) }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                    style={{ background: 'var(--surface)' }}
+                  >
+                    {session.workflow_type?.icon ?? '📋'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                      {session.title}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      {session.workflow_type?.name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {session.is_priority && (
+                      <span className="streak-badge text-xs">
+                        <Star size={10} fill="currentColor" /> Priority
+                      </span>
+                    )}
+                    {!session.is_priority && (
+                      <button
+                        className="text-xs px-2 py-1 rounded-lg transition-colors"
+                        style={{ color: 'var(--text-muted)', background: 'var(--surface)' }}
+                        onClick={(e) => { e.stopPropagation(); handleSetPriority(session) }}
+                      >
+                        Set Priority
+                      </button>
+                    )}
+                    <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
-  // Quiz
-  if (section === "quiz") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      <div style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", padding: "16px 16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>🧠 World Cup Quiz</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>20 questions · compare with everyone</p>
-          </div>
-          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
-        </div>
+        {/* Quote */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-12 text-center max-w-sm"
+        >
+          <p className="focus-tip">
+            &ldquo;{quote.quote}&rdquo;
+          </p>
+          {quote.author && (
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              — {quote.author}
+            </p>
+          )}
+        </motion.div>
       </div>
-      <div style={{ padding: "16px 16px 32px" }}>
-        <WorldCupQuiz player={currentPlayer} allPlayers={leaguePlayers} />
-      </div>
-    </div>
-  );
 
-  // Profile
-  if (section === "profile") return (
-    <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <button onClick={() => setSection("home")} className="btn-ghost" style={{ fontSize: "13px" }}>← Home</button>
-        <button onClick={() => { if (confirm("Log out? You'll need your email to log back in.")) handleLogout(); }} className="btn-ghost" style={{ fontSize: "13px", color: "var(--red)" }}>Log out</button>
-      </div>
-      <SignUp existingPlayer={currentPlayer} onComplete={p => { updatePlayer(p); setSection("home"); }} bonusLocked={adminState.bonusLocked} />
-    </div>
-  );
-
-  // Admin login
-  if (section === "adminLogin") return (
-    <div style={{ maxWidth: "400px", margin: "80px auto", padding: "0 16px" }}>
-      <div className="card" style={{ padding: "28px 24px", textAlign: "center" }}>
-        <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔐</div>
-        <h2 style={{ fontWeight: 800, fontSize: "18px", marginBottom: "6px" }}>Admin Access</h2>
-        <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "20px" }}>Enter the admin password to continue</p>
-        <input
-          type="password"
-          placeholder="Password"
-          value={adminPwInput}
-          onChange={e => { setAdminPwInput(e.target.value); setAdminPwError(false); }}
-          onKeyDown={e => e.key === "Enter" && handleAdminLogin()}
-          autoFocus
-          style={{ marginBottom: "8px", textAlign: "center", letterSpacing: "0.1em" }}
-        />
-        {adminPwError && <p style={{ fontSize: "12px", color: "var(--red)", marginBottom: "8px" }}>Incorrect password</p>}
-        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-          <button className="btn-primary" onClick={handleAdminLogin} style={{ flex: 1 }}>Enter</button>
-          <button className="btn-secondary" onClick={() => setSection("home")}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Admin
-  if (section === "admin") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      <div style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)", padding: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>⚙️ Admin Panel</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>Manage the league</p>
+      {/* Bottom quick stats */}
+      {!supabaseError && !loading && (
+        <div className="flex items-center justify-center gap-8 pb-8">
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <Clock size={14} />
+            {sessions.length} active session{sessions.length !== 1 ? 's' : ''}
           </div>
         </div>
-      </div>
-      <div style={{ padding: "16px" }}>
-        <AdminPanel adminState={adminState} onUpdate={setAdminState} />
-      </div>
-    </div>
-  );
-
-  return null;
+      )}
+    </main>
+  )
 }
