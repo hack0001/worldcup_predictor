@@ -90,6 +90,7 @@ export interface AdminState {
   predictionsLocked: boolean;
   lockTime: string | null;
   fantasyLocked: boolean;
+  bonusLocked: boolean;
 }
 
 // ── Scoring constants ─────────────────────────────────────

@@ -361,6 +361,43 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
             </div>
           </div>
 
+          {/* Bonus Predictions Lock */}
+          <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: "#fde68a", background: adminState.bonusLocked ? "#f0fdf4" : "#fffbeb" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: adminState.bonusLocked ? "var(--green)" : "#92400e" }}>
+                  🏆 Bonus Predictions Lock {adminState.bonusLocked ? "— 🔒 LOCKED" : ""}
+                </p>
+                {adminState.bonusLocked
+                  ? <p style={{ fontSize: "12px", color: "var(--green)", marginTop: "2px" }}>
+                      Bonus picks (Golden Boot, Top Assist, Winner, POTT) are locked. Only filled-in picks are locked — empty ones can still be entered.
+                    </p>
+                  : (() => {
+                      const filled = users.filter(u => u.topScorer || u.topAssist || u.tournamentWinner || u.playerOfTournament).length;
+                      const allFilled = users.filter(u => u.topScorer && u.topAssist && u.tournamentWinner && u.playerOfTournament).length;
+                      return <p style={{ fontSize: "12px", color: "#92400e", marginTop: "2px" }}>
+                        Locks Golden Boot, Top Assist, Tournament Winner, Player of Tournament.
+                        {" "}{allFilled}/{users.length} players fully completed, {filled}/{users.length} have at least one.
+                      </p>;
+                    })()
+                }
+              </div>
+              <button
+                className="btn-secondary"
+                style={{ background: adminState.bonusLocked ? "#22c55e" : "#f59e0b", borderColor: adminState.bonusLocked ? "#22c55e" : "#f59e0b", color: "white", flexShrink: 0 }}
+                onClick={async () => {
+                  const newLocked = !adminState.bonusLocked;
+                  if (newLocked && !confirm("Lock all bonus predictions? Players who have filled them in can't change them. Empty picks can still be entered.")) return;
+                  const updated = { ...adminState, bonusLocked: newLocked };
+                  await saveAdminState(updated);
+                  onUpdate(updated);
+                }}
+              >
+                {adminState.bonusLocked ? "🔓 Unlock Bonus Picks" : "🔒 Lock Bonus Picks"}
+              </button>
+            </div>
+          </div>
+
           {/* Awards */}
           <div className="card" style={{ padding: "18px", marginBottom: "20px" }}>
             <p style={{ fontWeight: 700, marginBottom: "14px" }}>Tournament Awards</p>

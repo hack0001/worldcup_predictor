@@ -35,7 +35,7 @@ export default function App() {
   const [adminState, setAdminState] = useState<AdminState>({
     isAdmin: false, results: { group: {}, knockout: {} },
     topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "",
-    predictionsLocked: false, lockTime: null, fantasyLocked: false,
+    predictionsLocked: false, lockTime: null, fantasyLocked: false, bonusLocked: false,
   });
   const [playerStats, setPlayerStats] = useState<Awaited<ReturnType<typeof getAllPlayerStats>>>([]);
   const [section, setSection] = useState<Section>("home");
@@ -345,7 +345,7 @@ export default function App() {
         <button onClick={() => setSection("home")} className="btn-ghost" style={{ fontSize: "13px" }}>← Home</button>
         <button onClick={() => { if (confirm("Log out? You'll need your email to log back in.")) handleLogout(); }} className="btn-ghost" style={{ fontSize: "13px", color: "var(--red)" }}>Log out</button>
       </div>
-      <SignUp existingPlayer={currentPlayer} onComplete={p => { updatePlayer(p); setSection("home"); }} />
+      <SignUp existingPlayer={currentPlayer} onComplete={p => { updatePlayer(p); setSection("home"); }} bonusLocked={adminState.bonusLocked} />
     </div>
   );
 

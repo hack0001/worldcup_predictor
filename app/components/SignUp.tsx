@@ -10,15 +10,16 @@ import { GROUPS } from "@/app/data/worldcup";
 // All qualified teams flat list
 const ALL_TEAMS = Object.values(GROUPS).flat().map(t => t.team).sort();
 
-function TeamPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TeamPicker({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
     <div>
       <label className="label">{label}</label>
       <div style={{ position: "relative" }}>
         <select
           value={value}
-          onChange={e => onChange(e.target.value)}
-          style={{ paddingLeft: value ? "36px" : "12px" }}
+          onChange={e => { if (!disabled) onChange(e.target.value); }}
+          disabled={disabled}
+          style={{ paddingLeft: value ? "36px" : "12px", opacity: disabled ? 0.7 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
         >
           <option value="">-- Pick a team --</option>
           {ALL_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -36,11 +37,12 @@ function TeamPicker({ label, value, onChange }: { label: string; value: string; 
 interface Props {
   onComplete: (player: Player) => void;
   existingPlayer?: Player | null;
+  bonusLocked?: boolean;
 }
 
 type Mode = "signup" | "login";
 
-export default function SignUp({ onComplete, existingPlayer }: Props) {
+export default function SignUp({ onComplete, existingPlayer, bonusLocked = false }: Props) {
   const [mode, setMode] = useState<Mode>("signup");
   const [form, setForm] = useState({
     name: existingPlayer?.name || "",
@@ -115,13 +117,16 @@ export default function SignUp({ onComplete, existingPlayer }: Props) {
               <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>Shows on the leaderboard and in chat. Keep it fun!</p>
             </div>
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
-              <p className="section-title" style={{ marginBottom: "4px" }}>Bonus Predictions</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <p className="section-title">Bonus Predictions</p>
+                {bonusLocked && <span style={{ fontSize: "11px", fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "99px" }}>🔒 Locked</span>}
+              </div>
               <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "16px" }}>Golden Boot +15 · Top Assist +10 · Winner +25 · POTT +20</p>
               <div style={{ display: "grid", gap: "16px" }}>
-                <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} />
-                <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} />
-                <TeamPicker label="🏆 Tournament Winner (+25pts)" value={form.tournamentWinner} onChange={(v) => setForm({ ...form, tournamentWinner: v })} />
-                <FlagSelect label="⭐ Player of the Tournament (+20pts)" value={form.playerOfTournament} onChange={(v) => setForm({ ...form, playerOfTournament: v })} />
+                <FlagSelect label="⚽ Golden Boot (Top Scorer)" value={form.topScorer} onChange={(v) => setForm({ ...form, topScorer: v })} disabled={bonusLocked && !!existingPlayer?.topScorer} />
+                <FlagSelect label="🎯 Top Assist Provider" value={form.topAssist} onChange={(v) => setForm({ ...form, topAssist: v })} disabled={bonusLocked && !!existingPlayer?.topAssist} />
+                <TeamPicker label="🏆 Tournament Winner (+25pts)" value={form.tournamentWinner} onChange={(v) => setForm({ ...form, tournamentWinner: v })} disabled={bonusLocked && !!existingPlayer?.tournamentWinner} />
+                <FlagSelect label="⭐ Player of the Tournament (+20pts)" value={form.playerOfTournament} onChange={(v) => setForm({ ...form, playerOfTournament: v })} disabled={bonusLocked && !!existingPlayer?.playerOfTournament} />
               </div>
             </div>
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>

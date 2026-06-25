@@ -71,7 +71,7 @@ export async function uploadAvatar(playerId: string, file: File): Promise<string
 // ── Admin ─────────────────────────────────────────────────
 export async function getAdminState(): Promise<AdminState> {
   const { data } = await supabase.from("admin_state").select("*").eq("id", 1).single();
-  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "", predictionsLocked: false, lockTime: null, fantasyLocked: false };
+  if (!data) return { isAdmin: false, results: { group: {}, knockout: {} }, topScorer: "", topAssist: "", tournamentWinner: "", playerOfTournament: "", predictionsLocked: false, lockTime: null, fantasyLocked: false, bonusLocked: false };
   return {
     isAdmin: false,
     results: data.results || { group: {}, knockout: {} },
@@ -82,6 +82,7 @@ export async function getAdminState(): Promise<AdminState> {
     predictionsLocked: data.predictions_locked || false,
     lockTime: data.lock_time || null,
     fantasyLocked: data.fantasy_locked || false,
+    bonusLocked: data.bonus_locked || false,
   };
 }
 export async function saveAdminState(state: AdminState): Promise<void> {
@@ -93,6 +94,7 @@ export async function saveAdminState(state: AdminState): Promise<void> {
     predictions_locked: state.predictionsLocked,
     lock_time: state.lockTime,
     fantasy_locked: state.fantasyLocked || false,
+    bonus_locked: state.bonusLocked || false,
   });
 }
 export function isPredictionLocked(adminState: AdminState): boolean {

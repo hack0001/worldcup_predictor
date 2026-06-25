@@ -6,9 +6,10 @@ interface FlagSelectProps {
   label: string;
   value: string;
   onChange: (player: string) => void;
+  disabled?: boolean;
 }
 
-export default function FlagSelect({ label, value, onChange }: FlagSelectProps) {
+export default function FlagSelect({ label, value, onChange, disabled = false }: FlagSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -61,14 +62,16 @@ export default function FlagSelect({ label, value, onChange }: FlagSelectProps) 
 
       <button
         type="button"
-        onClick={() => { setOpen(!open); setSearch(value && isCustom ? value : ""); }}
+        onClick={() => { if (disabled) return; setOpen(!open); setSearch(value && isCustom ? value : ""); }}
+        disabled={disabled}
         style={{
           width: "100%", display: "flex", alignItems: "center", gap: "8px",
-          padding: "9px 12px", background: "var(--surface)",
+          padding: "9px 12px", background: disabled ? "var(--surface2)" : "var(--surface)",
           border: "1.5px solid var(--border-strong)", borderRadius: "var(--radius)",
-          cursor: "pointer", textAlign: "left", fontSize: "14px",
+          cursor: disabled ? "not-allowed" : "pointer", textAlign: "left", fontSize: "14px",
           color: value ? "var(--text)" : "var(--text-3)",
           borderColor: open ? "var(--green)" : undefined,
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         {value && currentCountry && flagUrl(currentCountry) && (
