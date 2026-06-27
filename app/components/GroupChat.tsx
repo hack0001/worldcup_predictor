@@ -194,7 +194,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column-reverse" as React.CSSProperties["flexDirection"] }}>
+      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column-reverse" as React.CSSProperties["flexDirection"], overflowAnchor: "auto" as React.CSSProperties["overflowAnchor"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -204,6 +204,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
           </div>
         )}
 
+        <div style={{ display: "flex", flexDirection: "column" }}>
         {grouped.map(msg => {
           const sender = playerMap[msg.playerId];
           const isMe = msg.playerId === currentPlayer.id;
@@ -374,6 +375,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
             </div>
           );
         })}
+        </div>
 
       </div>
 
