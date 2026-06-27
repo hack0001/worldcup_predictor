@@ -261,11 +261,13 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
     const ah = parseInt(actual.homeScore), aa = parseInt(actual.awayScore);
     const validScores = !isNaN(ph) && !isNaN(pa) && !isNaN(ah) && !isNaN(aa);
 
-    if (validScores) {
-      const exactScore = ph === ah && pa === aa;
-      const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
-      const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
-      const correctResult = pr === ar;
+    // Only score if result has actually been entered
+    if (!validScores) continue;
+
+    const exactScore = ph === ah && pa === aa;
+    const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
+    const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
+    const correctResult = pr === ar;
 
       if (isEarly) {
         if (exactScore) add("KO correct scores (R32/R16)", POINTS.EARLY_KO_CORRECT_SCORE);
@@ -274,7 +276,6 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
         if (exactScore) add("KO correct scores (QF/SF/Final)", POINTS.LATE_KO_CORRECT_SCORE);
         else if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
       }
-    }
 
     // ET prediction
     if (actual.wentToET !== undefined) {
@@ -297,11 +298,16 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
     }
 
     // Correct qualifier
+    // Correct qualifier - only award if actual result has valid scores
+    const actualHomeScore = parseInt(actual.homeScore);
+    const actualAwayScore = parseInt(actual.awayScore);
+    if (isNaN(actualHomeScore) || isNaN(actualAwayScore)) continue; // no result yet
+
     const winner = actual.wentToPens
       ? actual.penWinner
       : actual.wentToET
         ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
-        : (parseInt(actual.homeScore) > parseInt(actual.awayScore) ? actual.homeTeam : actual.awayTeam);
+        : (actualHomeScore > actualAwayScore ? actual.homeTeam : actual.awayTeam);
 
     const predWinner = pred.goesToPens
       ? pred.penWinner
@@ -315,7 +321,7 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
       if (stage === "sf") add("Correct semi-finalist", POINTS.CORRECT_SEMI_FINALIST);
       if (stage === "final") add("Correct finalist", POINTS.CORRECT_FINALIST);
     }
-  }
+  } // end for knockout matches
 
   // ── Tournament awards ──
   if (adminState.topScorer && player.topScorer === adminState.topScorer) add("Golden Boot", POINTS.GOLDEN_BOOT);
@@ -324,7 +330,7 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
   if (adminState.tournamentWinner && player.tournamentWinner === adminState.tournamentWinner) add("Tournament Winner", POINTS.TOURNAMENT_WINNER);
 
   return { total, breakdown };
-}
+} // end calculatePlayerPoints
 
 // ── Fantasy points ────────────────────────────────────────
 export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[]): number {
