@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Player } from "@/app/data/types";
 import { Message, getMessages, sendMessage, deleteMessage, subscribeToMessages, getReactions, toggleReaction, subscribeToReactions, Reaction } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
@@ -80,20 +80,13 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
         (data || []).forEach(d => { pollMap[d.id] = { id: d.id, playerId: d.player_id, question: d.question, options: d.options, createdAt: d.created_at }; });
         setPolls(pollMap);
       }
-      // Wait for DOM then scroll — 300ms covers image/GIF render
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ block: "end" });
-      }, 300);
+
     });
   }, [leagueId]);
 
   const handleScroll = () => {};
 
-  // Scroll on new messages
-  useEffect(() => {
-    if (loading) return;
-    messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+
 
   const endRefCallback = (node: HTMLDivElement | null) => {
     (messagesEndRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -201,7 +194,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
       </div>
 
       {/* Messages */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "4px 0", minHeight: 0 }}>
+      <div ref={messagesContainerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column-reverse" as React.CSSProperties["flexDirection"] }}>
         {loading && <div style={{ textAlign: "center", padding: "40px", color: "var(--text-3)" }}>Loading...</div>}
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -381,7 +374,7 @@ export default function GroupChat({ currentPlayer, allPlayers, isAdmin, leagueId
             </div>
           );
         })}
-        <div ref={endRefCallback} style={{ height: 1, flexShrink: 0 }} />
+
       </div>
 
       {/* GIF Picker */}
