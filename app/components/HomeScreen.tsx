@@ -26,7 +26,7 @@ function parseKickoff(dateUK: string, timeUK: string): Date {
 
 export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, adminClickCount, onAdminClick }: Props) {
   const [localPreds, setLocalPreds] = useState<Record<string, { home: string; away: string }>>({});
-  const [localKoPreds, setLocalKoPreds] = useState<Record<string, { home: string; away: string }>>({});
+  const [localKoPreds, setLocalKoPreds] = useState<Record<string, { home: string; away: string; et?: boolean; etH?: string; etA?: string; pens?: boolean; penW?: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
   const saveKoPred = async (matchId: string, pred: { homeTeam: string; awayTeam: string; homeScore: string; awayScore: string; goesToET: boolean; etHomeScore: string; etAwayScore: string; goesToPens: boolean; penWinner: string }) => {
@@ -211,51 +211,113 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
           {/* Knockout R32 — inline predict all */}
           {(() => {
             const now = new Date();
-            const r32 = KNOCKOUT_MATCHES.r32 || [];
-            const unpredicted = r32.filter(m => {
+            const TEAM_FLAGS_MAP: Record<string,string> = {
+              "South Africa":"za","Canada":"ca","Germany":"de","Paraguay":"py","Netherlands":"nl","Morocco":"ma",
+              "Brazil":"br","Japan":"jp","France":"fr","Sweden":"se","Ivory Coast":"ci","Norway":"no","Mexico":"mx",
+              "Ecuador":"ec","England":"gb-eng","DR Congo":"cd","USA":"us","Bosnia and Herzegovina":"ba",
+              "Belgium":"be","Senegal":"sn","Croatia":"hr","Portugal":"pt","Spain":"es","Austria":"at",
+              "Switzerland":"ch","Algeria":"dz","Argentina":"ar","Cape Verde":"cv","Colombia":"co","Ghana":"gh",
+              "Australia":"au","Egypt":"eg",
+            };
+            const FlagImg = ({ team }: { team: string }) => {
+              const code = TEAM_FLAGS_MAP[team];
+              if (!code) return null;
+              return <img src={`https://flagcdn.com/w20/${code}.png`} width={20} height={14} style={{ borderRadius: 2, flexShrink: 0, objectFit: "cover" }} alt="" />;
+            };
+            // Show ALL R32 matches in chronological order, unpredicted and not yet kicked off
+            const r32 = [...(KNOCKOUT_MATCHES.r32 || [])].sort((a, b) => {
+              const ka = parseKickoff(a.dateUK, a.timeUK), kb = parseKickoff(b.dateUK, b.timeUK);
+              return ka.getTime() - kb.getTime();
+            });
+            const toShow = r32.filter(m => {
               const ko = parseKickoff(m.dateUK, m.timeUK);
               const pred = player.knockoutPredictions?.[m.id];
               const hasPred = pred?.homeScore !== "" && pred?.homeScore !== undefined;
               return ko > now && !hasPred;
             });
-            if (!unpredicted.length) return null;
+            if (!toShow.length) return null;
             return (
               <div>
-                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⚔️ Round of 32 — add your predictions</p>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⚔️ Round of 32 — predict now</p>
                 <div style={{ display: "grid", gap: "8px" }}>
-                  {unpredicted.map(m => {
+                  {toShow.map(m => {
                     const [homeTeam, awayTeam] = m.placeholder.split(" vs ");
                     const ko = parseKickoff(m.dateUK, m.timeUK);
                     const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
-                    const timeLabel = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : m.dateUK;
-                    const local = localKoPreds[m.id] || { home: "", away: "" };
+                    const locked = diffH <= 0;
+                    const timeLabel = locked ? "🔒 Started" : diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : m.dateUK;
+                    const lk = localKoPreds[m.id] || { home: "", away: "", et: false, etH: "", etA: "", pens: false, penW: "" };
                     const isSaving = saving === m.id;
-                    const canSave = local.home !== "" && local.away !== "";
+                    const canSave = !locked && lk.home !== "" && lk.away !== "";
                     return (
-                      <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${diffH < 3 ? "#ef4444" : "#3b82f6"}` }}>
+                      <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${locked ? "#d1d5db" : diffH < 3 ? "#ef4444" : "#3b82f6"}`, opacity: locked ? 0.6 : 1 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                           <span style={{ fontSize: "11px", color: "var(--text-3)" }}>R32 · {m.city} · {m.dateUK}</span>
-                          <span style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#3b82f6" }}>{timeLabel} to go</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: locked ? "var(--text-3)" : diffH < 3 ? "#ef4444" : "#3b82f6" }}>{timeLabel}</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, textAlign: "right" }}>{homeTeam}</span>
-                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2}
-                            value={local.home}
-                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...local, home: e.target.value.replace(/[^0-9]/g, "") } }))}
-                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }} />
+                        {/* Score row */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ flex: 1, fontSize: "12px", fontWeight: 600, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                            {homeTeam} <FlagImg team={homeTeam} />
+                          </span>
+                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2} disabled={locked}
+                            value={lk.home}
+                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, home: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 40, textAlign: "center", fontWeight: 800, fontSize: "17px", padding: "5px 3px" }} />
                           <span style={{ color: "var(--text-3)", fontWeight: 700 }}>–</span>
-                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2}
-                            value={local.away}
-                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...local, away: e.target.value.replace(/[^0-9]/g, "") } }))}
-                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }} />
-                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{awayTeam}</span>
-                          <button type="button"
-                            onClick={() => saveKoPred(m.id, { homeTeam: homeTeam || "", awayTeam: awayTeam || "", homeScore: local.home, awayScore: local.away, goesToET: false, etHomeScore: "", etAwayScore: "", goesToPens: false, penWinner: "" })}
-                            disabled={!canSave || isSaving}
-                            style={{ padding: "6px 12px", borderRadius: "8px", border: "none", background: canSave ? "#3b82f6" : "var(--border)", color: canSave ? "white" : "var(--text-3)", fontWeight: 700, fontSize: "12px", cursor: canSave ? "pointer" : "default", flexShrink: 0 }}>
-                            {isSaving ? "..." : "✓"}
-                          </button>
+                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2} disabled={locked}
+                            value={lk.away}
+                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, away: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 40, textAlign: "center", fontWeight: 800, fontSize: "17px", padding: "5px 3px" }} />
+                          <span style={{ flex: 1, fontSize: "12px", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                            <FlagImg team={awayTeam} /> {awayTeam}
+                          </span>
                         </div>
+                        {/* ET / Pens toggles */}
+                        {!locked && lk.home !== "" && lk.away !== "" && lk.home === lk.away && (
+                          <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                            <button type="button" onClick={() => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, et: !lk.et, pens: false, penW: "" } }))}
+                              style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "5px", border: "1px solid", borderColor: lk.et ? "#f59e0b" : "var(--border)", background: lk.et ? "#fef3c7" : "var(--surface2)", color: lk.et ? "#92400e" : "var(--text-3)", cursor: "pointer", fontWeight: 700 }}>
+                              {lk.et ? "✓ ET" : "+ ET"}
+                            </button>
+                            {lk.et && (
+                              <>
+                                <input type="text" inputMode="numeric" placeholder="–" maxLength={2} value={lk.etH}
+                                  onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, etH: e.target.value.replace(/[^0-9]/g,"") } }))}
+                                  style={{ width: 34, textAlign: "center", fontSize: "14px", fontWeight: 700, padding: "3px" }} />
+                                <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
+                                <input type="text" inputMode="numeric" placeholder="–" maxLength={2} value={lk.etA}
+                                  onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, etA: e.target.value.replace(/[^0-9]/g,"") } }))}
+                                  style={{ width: 34, textAlign: "center", fontSize: "14px", fontWeight: 700, padding: "3px" }} />
+                                {lk.etH !== "" && lk.etA !== "" && lk.etH === lk.etA && (
+                                  <button type="button" onClick={() => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, pens: !lk.pens } }))}
+                                    style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "5px", border: "1px solid", borderColor: lk.pens ? "#ef4444" : "var(--border)", background: lk.pens ? "#fee2e2" : "var(--surface2)", color: lk.pens ? "#991b1b" : "var(--text-3)", cursor: "pointer", fontWeight: 700 }}>
+                                    {lk.pens ? "✓ Pens" : "+ Pens"}
+                                  </button>
+                                )}
+                                {lk.pens && (
+                                  <select value={lk.penW} onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...lk, penW: e.target.value } }))}
+                                    style={{ fontSize: "11px", padding: "3px 6px", borderRadius: "5px" }}>
+                                    <option value="">Winner?</option>
+                                    <option value={homeTeam}>{homeTeam}</option>
+                                    <option value={awayTeam}>{awayTeam}</option>
+                                  </select>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {/* Save */}
+                        {!locked && (
+                          <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end" }}>
+                            <button type="button"
+                              onClick={() => saveKoPred(m.id, { homeTeam: homeTeam||"", awayTeam: awayTeam||"", homeScore: lk.home, awayScore: lk.away, goesToET: lk.et||false, etHomeScore: lk.etH||"", etAwayScore: lk.etA||"", goesToPens: lk.pens||false, penWinner: lk.penW||"" })}
+                              disabled={!canSave || isSaving}
+                              style={{ padding: "6px 16px", borderRadius: "8px", border: "none", background: canSave ? "#3b82f6" : "var(--border)", color: canSave ? "white" : "var(--text-3)", fontWeight: 700, fontSize: "12px", cursor: canSave ? "pointer" : "default" }}>
+                              {isSaving ? "..." : "✓ Save"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

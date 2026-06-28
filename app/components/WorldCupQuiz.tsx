@@ -138,7 +138,7 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
       <div style={{ marginBottom: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <h2 style={{ fontSize: "17px", fontWeight: 800 }}>🧠 World Cup Quiz</h2>
-          <span style={{ fontWeight: 700, fontSize: "14px", color: answered === 20 ? "var(--green)" : "var(--text-2)" }}>
+          <span style={{ fontWeight: 700, fontSize: "14px", color: answered === QUESTIONS.length ? "var(--green)" : "var(--text-2)" }}>
             {answered}/20 answered · {score} correct
           </span>
         </div>
@@ -168,7 +168,7 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "16px" }}>
           <span style={{ fontSize: "28px", flexShrink: 0 }}>{q.emoji}</span>
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px", fontWeight: 600 }}>QUESTION {currentQ + 1} OF 20</p>
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px", fontWeight: 600 }}>QUESTION {currentQ + 1} OF {QUESTIONS.length}</p>
             <p style={{ fontWeight: 700, fontSize: "15px", lineHeight: 1.4 }}>{q.question}</p>
           </div>
           {/* Timer */}
@@ -280,7 +280,7 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
       </div>
 
       {/* Final score if all done */}
-      {answered === 20 && (
+      {answered === QUESTIONS.length && (
         <div className="card" style={{ marginTop: "16px", padding: "20px", textAlign: "center", borderColor: "var(--green)" }}>
           <p style={{ fontSize: "32px", marginBottom: "8px" }}>{score >= 16 ? "🏆" : score >= 12 ? "⭐" : score >= 8 ? "😅" : "🤦"}</p>
           <p style={{ fontWeight: 800, fontSize: "20px", marginBottom: "4px" }}>{score}/20</p>
