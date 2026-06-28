@@ -11,6 +11,7 @@ interface Props {
   adminState: AdminState;
   onUpdate: (state: AdminState) => void;
   onClose?: () => void;
+  currentPlayerId?: string;
 }
 
 
@@ -61,7 +62,7 @@ function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
   );
 }
 
-export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
+export default function AdminPanel({ adminState, onUpdate, onClose, currentPlayerId = "admin" }: Props) {
   const [authenticated] = useState(true); // Auth handled by page-level login
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
@@ -413,7 +414,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   // Send to all known league IDs + no league
                   const leagues = await getAllLeagues();
                   for (const l of leagues) {
-                    await sendMessage("admin", `📢 ${msg}`, "", "", l.id);
+                    await sendMessage(currentPlayerId, `📢 ${msg}`, "", "", l.id);
                   }
                   alert("Sent!");
                 }}>
