@@ -32,6 +32,7 @@ export default function App() {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [currentLeague, setCurrentLeague] = useState<League | null>(null);
   const [leaguePlayers, setLeaguePlayers] = useState<Player[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [fantasySquads, setFantasySquads] = useState<Awaited<ReturnType<typeof getAllFantasySquads>>>([]);
   const [adminState, setAdminState] = useState<AdminState>({
     isAdmin: false, results: { group: {}, knockout: {} },
@@ -121,7 +122,14 @@ export default function App() {
   useEffect(() => {
     if (fanTab === "board") {
       getAllPlayerStats().then(setPlayerStats);
-      getAllFantasySquads().then(setFantasySquads);
+      getAllFantasySquads().then(squads => {
+        setFantasySquads(squads);
+        // Load ALL players who have a squad with at least 1 player picked
+        const pickedPlayerIds = new Set(squads.filter(s => s.squad?.length > 0).map(s => s.playerId));
+        if (pickedPlayerIds.size > 0) {
+          getPlayers().then(all => setAllPlayers(all.filter(p => pickedPlayerIds.has(p.id))));
+        }
+      });
     }
   }, [fanTab]);
 
@@ -332,7 +340,7 @@ export default function App() {
       <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} fantasyLocked={adminState.fantasyLocked} />}
         {fanTab === "board" && <FantasyLeaderboard
-          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
+          players={allPlayers.some(p => p.id === currentPlayer.id) ? allPlayers : (fantasySquads.some(s => s.playerId === currentPlayer.id && s.squad?.length > 0) ? [...allPlayers, currentPlayer] : allPlayers)}
           squads={fantasySquads}
           stats={playerStats}
           currentPlayerId={currentPlayer.id}
