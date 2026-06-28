@@ -51,12 +51,22 @@ export interface FantasyPlayer {
   name: string;
   country: string;
   position: "GK" | "DEF" | "MID" | "FWD";
+  addedAt?: string;    // ISO timestamp when player was confirmed into squad
+  removedAt?: string;  // ISO timestamp when player was transferred out
+}
+
+export interface TransferEntry {
+  playerIn: string;
+  playerOut: string;
+  confirmedAt: string; // ISO timestamp
 }
 
 export interface FantasySquad {
   id: string;
   playerId: string;
-  squad: FantasyPlayer[];
+  squad: FantasyPlayer[];       // current active players
+  history: FantasyPlayer[];     // all past players (removed ones)
+  transfers: TransferEntry[];   // transfer log
   round: string;
   updatedAt: string;
 }

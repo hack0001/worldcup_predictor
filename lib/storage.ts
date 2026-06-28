@@ -108,14 +108,14 @@ export async function getFantasySquad(playerId: string): Promise<FantasySquad | 
   const { data, error } = await supabase.from("fantasy_squads").select("*").eq("player_id", playerId).maybeSingle();
   if (error) { console.error("getFantasySquad error:", error.message); return null; }
   if (!data) return null;
-  return { id: data.id, playerId: data.player_id, squad: data.squad || [], round: data.round, updatedAt: data.updated_at };
+  return { id: data.id, playerId: data.player_id, squad: data.squad || [], history: data.history || [], transfers: data.transfers || [], round: data.round, updatedAt: data.updated_at };
 }
 export async function getAllFantasySquads(): Promise<FantasySquad[]> {
   const { data } = await supabase.from("fantasy_squads").select("*");
-  return (data || []).map(d => ({ id: d.id, playerId: d.player_id, squad: d.squad || [], round: d.round, updatedAt: d.updated_at }));
+  return (data || []).map(d => ({ id: d.id, playerId: d.player_id, squad: d.squad || [], history: d.history || [], transfers: d.transfers || [], round: d.round, updatedAt: d.updated_at }));
 }
 export async function saveFantasySquad(squad: FantasySquad): Promise<void> {
-  const { error } = await supabase.from("fantasy_squads").upsert({ id: squad.playerId, player_id: squad.playerId, squad: squad.squad, round: squad.round, updated_at: new Date().toISOString() });
+  const { error } = await supabase.from("fantasy_squads").upsert({ id: squad.playerId, player_id: squad.playerId, squad: squad.squad, history: squad.history || [], transfers: squad.transfers || [], round: squad.round, updated_at: new Date().toISOString() });
   if (error) console.error("saveFantasySquad error:", error.message);
 }
 
@@ -335,8 +335,32 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
 // ── Fantasy points ────────────────────────────────────────
 export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[]): number {
   let total = 0;
-  for (const fp of squad.squad) {
+
+  // Build match kickoff lookup from GROUP_MATCHES + KNOCKOUT_MATCHES
+  const MONTHS: Record<string, number> = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  const matchKickoff: Record<string, Date> = {};
+  const allMatches = [...GROUP_MATCHES, ...(KNOCKOUT_MATCHES.r32||[]), ...(KNOCKOUT_MATCHES.r16||[]), ...(KNOCKOUT_MATCHES.qf||[]), ...(KNOCKOUT_MATCHES.sf||[]), ...(KNOCKOUT_MATCHES.final||[])];
+  for (const m of allMatches) {
+    try {
+      const [day, mon] = m.dateUK.split(" ");
+      const [hh, mm] = m.timeUK.replace(/ BST| GMT/, "").split(":");
+      const isBST = m.timeUK.includes("BST");
+      matchKickoff[m.id] = new Date(Date.UTC(2026, MONTHS[mon], +day, +hh - (isBST ? 1 : 0), +mm));
+    } catch { /* ignore */ }
+  }
+
+  // Score both current squad and removed players (history)
+  const allPlayers = [...squad.squad, ...(squad.history || [])];
+
+  for (const fp of allPlayers) {
+    const addedAt = fp.addedAt ? new Date(fp.addedAt) : new Date(0); // beginning of time if original squad
+    const removedAt = fp.removedAt ? new Date(fp.removedAt) : new Date(9999, 0); // far future if still active
+
     for (const s of stats.filter(s => s.playerName === fp.name)) {
+      // Check if this match was played while player was in the squad
+      const ko = s.matchId ? matchKickoff[s.matchId] : null;
+      if (ko && (ko < addedAt || ko >= removedAt)) continue; // outside their window — skip
+
       if (fp.position === "FWD") total += s.goals * FANTASY_POINTS.GOAL_FWD;
       else if (fp.position === "MID") total += s.goals * FANTASY_POINTS.GOAL_MID;
       else total += s.goals * FANTASY_POINTS.GOAL_DEF;

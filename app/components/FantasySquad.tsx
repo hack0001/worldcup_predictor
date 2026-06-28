@@ -29,16 +29,16 @@ function FlagImg({ country, size = 18 }: { country: string; size?: number }) {
 }
 
 // ── Pitch View ────────────────────────────────────────────
-function PlayerCard({ fp, onRemove, points }: { fp: FantasyPlayer; onRemove?: () => void; points?: { pts: number; breakdown: string } }) {
+function PlayerCard({ fp, onRemove, points, transferOut }: { fp: FantasyPlayer; onRemove?: () => void; points?: { pts: number; breakdown: string }; transferOut?: boolean }) {
   const code = TEAM_FLAGS[fp.country];
   const shirtColor = POSITION_COLORS[fp.position];
   const shortName = fp.name.split(" ").pop() || fp.name;
 
   return (
     <div
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: onRemove ? "pointer" : "default", minWidth: 80 }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: onRemove ? "pointer" : "default", minWidth: 80, outline: transferOut ? "2px solid #ef4444" : "none", borderRadius: 8, padding: transferOut ? "2px" : undefined }}
       onClick={onRemove}
-      title={onRemove ? `Remove ${fp.name}` : fp.name}
+      title={transferOut ? `Transfer out: ${fp.name}` : onRemove ? `Remove ${fp.name}` : fp.name}
     >
       {/* Country flag on top */}
       <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -88,14 +88,14 @@ function EmptySlot({ position }: { position: FantasyPlayer["position"] }) {
   );
 }
 
-function PitchView({ squad, onRemove, positionLimits, getPlayerPoints }: { squad: FantasyPlayer[]; onRemove: (name: string) => void; positionLimits: { GK: number; DEF: number; MID: number; FWD: number; label?: string }; getPlayerPoints?: (fp: FantasyPlayer) => { pts: number; breakdown: string } }) {
+function PitchView({ squad, onRemove, positionLimits, getPlayerPoints, highlightForTransfer }: { squad: FantasyPlayer[]; onRemove: (name: string) => void; positionLimits: { GK: number; DEF: number; MID: number; FWD: number; label?: string }; getPlayerPoints?: (fp: FantasyPlayer) => { pts: number; breakdown: string }; highlightForTransfer?: boolean }) {
   const byPos: Record<string, FantasyPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
   squad.forEach(p => byPos[p.position].push(p));
 
   const Row = ({ pos }: { pos: FantasyPlayer["position"] }) => (
     <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-start", padding: "10px 4px" }}>
       {byPos[pos].length > 0
-        ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} points={getPlayerPoints ? getPlayerPoints(p) : undefined} />)
+        ? byPos[pos].map(p => <PlayerCard key={p.name} fp={p} onRemove={() => onRemove(p.name)} points={getPlayerPoints ? getPlayerPoints(p) : undefined} transferOut={highlightForTransfer} />)
         : Array.from({ length: positionLimits[pos] || 0 }).map((_, i) => <EmptySlot key={i} position={pos} />)
       }
     </div>
@@ -128,6 +128,9 @@ function PitchView({ squad, onRemove, positionLimits, getPlayerPoints }: { squad
 // ── Main Component ─────────────────────────────────────────
 export default function FantasySquadPicker({ player, fantasyLocked = false }: Props) {
   const [squad, setSquad] = useState<FantasyPlayer[]>([]);
+  const [squadHistory, setSquadHistory] = useState<FantasyPlayer[]>([]);
+  const [squadTransfers, setSquadTransfers] = useState<{playerIn:string;playerOut:string;confirmedAt:string}[]>([]);
+  const [pendingTransfer, setPendingTransfer] = useState<{ playerIn: FantasyPlayer; playerOut: string } | null>(null);
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [formation, setFormation] = useState(DEFAULT_FORMATION);
   const [loading, setLoading] = useState(true);
@@ -141,6 +144,8 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
   useEffect(() => {
     getFantasySquad(player.id).then(existing => {
       if (existing?.squad?.length) setSquad(existing.squad);
+      if (existing?.history?.length) setSquadHistory(existing.history);
+      if (existing?.transfers?.length) setSquadTransfers(existing.transfers);
       if ((existing as { formation?: string })?.formation) setFormation((existing as { formation?: string }).formation!);
       setLoading(false);
     });
@@ -169,12 +174,30 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
 
   const totalPoints = squad.reduce((sum, fp) => sum + getPlayerPoints(fp).pts, 0);
 
-  const persist = async (newSquad: FantasyPlayer[], newFormation = formation) => {
+  const persist = async (newSquad: FantasyPlayer[], newFormation = formation, newHistory = squadHistory, newTransfers = squadTransfers) => {
     setSaving(true);
-    const fs = { id: player.id, playerId: player.id, squad: newSquad, formation: newFormation, round: "group", updatedAt: new Date().toISOString() } as FantasySquadType & { formation: string };
+    const fs = { id: player.id, playerId: player.id, squad: newSquad, history: newHistory, transfers: newTransfers, formation: newFormation, round: "group", updatedAt: new Date().toISOString() } as FantasySquadType & { formation: string };
     await saveFantasySquad(fs as unknown as FantasySquadType);
     setSaved(true); setSaving(false);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const confirmTransfer = async () => {
+    if (!pendingTransfer) return;
+    const now = new Date().toISOString();
+    const { playerIn, playerOut } = pendingTransfer;
+    // Mark removed player with removedAt, move to history
+    const removedPlayer = squad.find(s => s.name === playerOut);
+    const newHistory = [...squadHistory];
+    if (removedPlayer) newHistory.push({ ...removedPlayer, removedAt: now });
+    // Add new player with addedAt
+    const newSquad = squad.filter(s => s.name !== playerOut).concat({ ...playerIn, addedAt: now });
+    const newTransfers = [...squadTransfers, { playerIn: playerIn.name, playerOut, confirmedAt: now }];
+    setSquad(newSquad);
+    setSquadHistory(newHistory);
+    setSquadTransfers(newTransfers);
+    setPendingTransfer(null);
+    await persist(newSquad, formation, newHistory, newTransfers);
   };
 
   const changeFormation = (newFormation: string) => {
@@ -196,16 +219,28 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
 
   const addPlayer = (fp: FantasyPlayer) => {
     if (isLocked) return;
-    if (squad.length >= 11) return;
-    if (squad.filter(s => s.position === fp.position).length >= Number(POSITION_LIMITS[fp.position as keyof typeof POSITION_LIMITS] || 0)) return;
     if (squad.find(s => s.name === fp.name)) return;
-    const next = [...squad, fp];
-    setSquad(next);
-    persist(next);
+    if (squad.length < 11) {
+      // Initial squad building — no transfer needed, just add with addedAt
+      const now = squad.some(s => s.addedAt) ? new Date().toISOString() : undefined; // only set addedAt if transfers have started
+      const next = [...squad, { ...fp, addedAt: now }];
+      setSquad(next);
+      persist(next);
+    } else {
+      // Squad full — stage as pending transfer, user picks who to swap out
+      setPendingTransfer({ playerIn: fp, playerOut: "" });
+      setActiveTab("squad"); // switch to squad view to pick who comes out
+    }
   };
 
   const removePlayer = (name: string) => {
     if (isLocked) return;
+    if (pendingTransfer) {
+      // User is picking who comes out for a pending transfer
+      setPendingTransfer(prev => prev ? { ...prev, playerOut: name } : null);
+      return;
+    }
+    // Squad under 11 — direct removal, no transfer record needed
     const next = squad.filter(s => s.name !== name);
     setSquad(next);
     persist(next);
@@ -288,7 +323,47 @@ export default function FantasySquadPicker({ player, fantasyLocked = false }: Pr
               </div>
             </div>
           )}
-          <PitchView squad={squad} onRemove={removePlayer} positionLimits={POSITION_LIMITS} getPlayerPoints={getPlayerPoints} />
+          <PitchView squad={squad} onRemove={removePlayer} positionLimits={POSITION_LIMITS} getPlayerPoints={getPlayerPoints}
+            highlightForTransfer={!!pendingTransfer && !pendingTransfer.playerOut} />
+
+          {/* Pending transfer banner */}
+          {pendingTransfer && (
+            <div style={{ margin: "10px 0", padding: "12px 14px", borderRadius: "10px", background: "#fffbeb", border: "2px solid #f59e0b" }}>
+              <p style={{ fontWeight: 700, fontSize: "13px", color: "#92400e", marginBottom: "6px" }}>
+                ⚡ Transfer: <span style={{ color: "var(--green)" }}>IN: {pendingTransfer.playerIn.name}</span>
+              </p>
+              {!pendingTransfer.playerOut ? (
+                <p style={{ fontSize: "12px", color: "#92400e" }}>👆 Tap a player on the pitch to swap them out</p>
+              ) : (
+                <div>
+                  <p style={{ fontSize: "12px", color: "#92400e", marginBottom: "8px" }}>
+                    <span style={{ color: "#ef4444" }}>OUT: {pendingTransfer.playerOut}</span> → <span style={{ color: "var(--green)" }}>IN: {pendingTransfer.playerIn.name}</span>
+                  </p>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={confirmTransfer} style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: "var(--green)", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
+                      ✅ Confirm Transfer
+                    </button>
+                    <button onClick={() => setPendingTransfer(null)} style={{ padding: "7px 12px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text-2)", fontSize: "13px", cursor: "pointer" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Transfer history */}
+          {squadTransfers.length > 0 && (
+            <div style={{ marginTop: "12px", padding: "10px 14px", borderRadius: "8px", background: "var(--surface2)", border: "1px solid var(--border)" }}>
+              <p style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-2)", marginBottom: "6px" }}>🔄 Transfers ({squadTransfers.length})</p>
+              {squadTransfers.map((t, i) => (
+                <p key={i} style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "2px" }}>
+                  <span style={{ color: "var(--green)" }}>↑ {t.playerIn}</span> / <span style={{ color: "#ef4444" }}>↓ {t.playerOut}</span>
+                  <span style={{ marginLeft: "6px" }}>{new Date(t.confirmedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                </p>
+              ))}
+            </div>
+          )}
           
           {squad.length === 0 && (
             <div style={{ textAlign: "center", marginTop: "16px" }}>
