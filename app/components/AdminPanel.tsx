@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
-import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer } from "@/lib/storage";
+import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage } from "@/lib/storage";
 import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm, bustFormCache } from "@/lib/footballApi";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
@@ -396,6 +396,31 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 {adminState.bonusLocked ? "🔓 Unlock Bonus Picks" : "🔒 Lock Bonus Picks"}
               </button>
             </div>
+          </div>
+
+          {/* Broadcast Message */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>📢 Broadcast to Chat</p>
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>Send a message to all leagues simultaneously from admin</p>
+            {[
+              "🚨 The Round of 32 has started! Head to the Knockouts tab to enter your predictions NOW before matches kick off!",
+              "🔒 Bonus predictions (Golden Boot, Top Assist, Winner, Player of Tournament) are now locked!",
+              "👕 Fantasy squad selections are now locked — no more changes!",
+            ].map(msg => (
+              <button key={msg} className="btn-secondary" style={{ display: "block", width: "100%", textAlign: "left", marginBottom: "6px", fontSize: "12px", padding: "8px 10px" }}
+                onClick={async () => {
+                  if (!confirm(`Send to all leagues: "${msg.substring(0,60)}..."`)) return;
+                  // Send to all known league IDs + no league
+                  const leagues = await (await import("@/lib/storage")).getAllLeagues();
+                  for (const l of leagues) {
+                    await sendMessage("admin", `📢 Admin: ${msg}`, "", "", l.id);
+                  }
+                  await sendMessage("admin", `📢 Admin: ${msg}`);
+                  alert("Sent!");
+                }}>
+                {msg.substring(0, 80)}…
+              </button>
+            ))}
           </div>
 
           {/* Awards */}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Player } from "@/app/data/types";
 import { League, savePlayer } from "@/lib/storage";
 import { AvatarDisplay } from "./AvatarPicker";
-import { GROUP_MATCHES } from "@/app/data/worldcup";
+import { GROUP_MATCHES, KNOCKOUT_MATCHES } from "@/app/data/worldcup";
 
 interface Props {
   player: Player;
@@ -26,7 +26,21 @@ function parseKickoff(dateUK: string, timeUK: string): Date {
 
 export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, adminClickCount, onAdminClick }: Props) {
   const [localPreds, setLocalPreds] = useState<Record<string, { home: string; away: string }>>({});
+  const [localKoPreds, setLocalKoPreds] = useState<Record<string, { home: string; away: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
+
+  const saveKoPred = async (matchId: string, pred: { homeTeam: string; awayTeam: string; homeScore: string; awayScore: string; goesToET: boolean; etHomeScore: string; etAwayScore: string; goesToPens: boolean; penWinner: string }) => {
+    if (pred.homeScore === "" || pred.awayScore === "") return;
+    setSaving(matchId);
+    const updated = {
+      ...player,
+      knockoutPredictions: { ...player.knockoutPredictions, [matchId]: pred },
+    };
+    await savePlayer(updated);
+    onUpdate(updated);
+    setLocalKoPreds(prev => { const n = { ...prev }; delete n[matchId]; return n; });
+    setSaving(null);
+  };
 
   const savePred = async (matchId: string, home: string, away: string) => {
     if (home === "" || away === "") return;
@@ -194,6 +208,62 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
             );
           })()}
 
+          {/* Knockout R32 — inline predict all */}
+          {(() => {
+            const now = new Date();
+            const r32 = KNOCKOUT_MATCHES.r32 || [];
+            const unpredicted = r32.filter(m => {
+              const ko = parseKickoff(m.dateUK, m.timeUK);
+              const pred = player.knockoutPredictions?.[m.id];
+              const hasPred = pred?.homeScore !== "" && pred?.homeScore !== undefined;
+              return ko > now && !hasPred;
+            });
+            if (!unpredicted.length) return null;
+            return (
+              <div>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⚔️ Round of 32 — add your predictions</p>
+                <div style={{ display: "grid", gap: "8px" }}>
+                  {unpredicted.map(m => {
+                    const [homeTeam, awayTeam] = m.placeholder.split(" vs ");
+                    const ko = parseKickoff(m.dateUK, m.timeUK);
+                    const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
+                    const timeLabel = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : m.dateUK;
+                    const local = localKoPreds[m.id] || { home: "", away: "" };
+                    const isSaving = saving === m.id;
+                    const canSave = local.home !== "" && local.away !== "";
+                    return (
+                      <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${diffH < 3 ? "#ef4444" : "#3b82f6"}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "11px", color: "var(--text-3)" }}>R32 · {m.city} · {m.dateUK}</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#3b82f6" }}>{timeLabel} to go</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, textAlign: "right" }}>{homeTeam}</span>
+                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2}
+                            value={local.home}
+                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...local, home: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }} />
+                          <span style={{ color: "var(--text-3)", fontWeight: 700 }}>–</span>
+                          <input type="text" inputMode="numeric" placeholder="–" maxLength={2}
+                            value={local.away}
+                            onChange={e => setLocalKoPreds(prev => ({ ...prev, [m.id]: { ...local, away: e.target.value.replace(/[^0-9]/g, "") } }))}
+                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }} />
+                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{awayTeam}</span>
+                          <button type="button"
+                            onClick={() => saveKoPred(m.id, { homeTeam: homeTeam || "", awayTeam: awayTeam || "", homeScore: local.home, awayScore: local.away, goesToET: false, etHomeScore: "", etAwayScore: "", goesToPens: false, penWinner: "" })}
+                            disabled={!canSave || isSaving}
+                            style={{ padding: "6px 12px", borderRadius: "8px", border: "none", background: canSave ? "#3b82f6" : "var(--border)", color: canSave ? "white" : "var(--text-3)", fontWeight: 700, fontSize: "12px", cursor: canSave ? "pointer" : "default", flexShrink: 0 }}>
+                            {isSaving ? "..." : "✓"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Predictions */}
           <button
             onClick={() => onNav("predictions")}
@@ -248,8 +318,8 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
             <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
               <div style={{ width: 52, height: 52, borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>🧠</div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>World Cup Quiz</p>
-                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>20 questions · trivia · see what others said</p>
+                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>World Cup Quiz <span style={{ fontSize: "11px", background: "#ef4444", borderRadius: "99px", padding: "2px 7px", fontWeight: 700, verticalAlign: "middle", marginLeft: "4px" }}>NEW</span></p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>19 knockout questions · fresh slate</p>
               </div>
               <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
             </div>

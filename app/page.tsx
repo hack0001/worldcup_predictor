@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Player, AdminState } from "@/app/data/types";
+import { KNOCKOUT_MATCHES } from "@/app/data/worldcup";
 import { getAdminState, getPlayers } from "@/lib/storage";
 import { League, getLeaguesByIds, getPlayersInLeague } from "@/lib/storage";
 
@@ -195,18 +196,30 @@ export default function App() {
     />
   );
 
-  const confirmedTeams = Object.fromEntries(
-    Object.entries(adminState.results.knockout || {}).map(([id, r]) => [id, { home: r.homeTeam || "", away: r.awayTeam || "" }])
-  );
+  const confirmedTeams = Object.fromEntries([
+    // Auto-populate R32 from the now-confirmed placeholder text
+    ...(KNOCKOUT_MATCHES.r32 || []).map(m => {
+      const adminResult = adminState.results.knockout?.[m.id];
+      const parts = m.placeholder.split(" vs ");
+      return [m.id, {
+        home: adminResult?.homeTeam || parts[0] || "",
+        away: adminResult?.awayTeam || parts[1] || "",
+      }];
+    }),
+    // Later rounds come from admin results only
+    ...Object.entries(adminState.results.knockout || {})
+      .filter(([id]) => !id.startsWith("r32-"))
+      .map(([id, r]) => [id, { home: r.homeTeam || "", away: r.awayTeam || "" }])
+  ]);
 
   const PRED_TABS = [
     { id: "board", label: "Leaderboard", emoji: "🏆" },
-    { id: "groups", label: "Groups", emoji: "🏟️" },
-    { id: "chat", label: "Chat", emoji: "💬" },
     { id: "knockout", label: "Knockouts", emoji: "⚔️" },
+    { id: "chat", label: "Chat", emoji: "💬" },
+    { id: "groups", label: "Groups", emoji: "🏟️" },
     { id: "standings", label: "Standings", emoji: "📊" },
     { id: "teams", label: "Teams", emoji: "📋" },
-    { id: "polls", label: "Polls", emoji: "📊" },
+    { id: "polls", label: "Polls", emoji: "🗳️" },
   ];
 
   const FAN_TABS = [

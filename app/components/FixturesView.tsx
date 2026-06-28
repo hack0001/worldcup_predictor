@@ -1,6 +1,6 @@
 "use client";
 import { Player } from "@/app/data/types";
-import { GROUP_MATCHES, TEAM_FLAGS } from "@/app/data/worldcup";
+import { GROUP_MATCHES, KNOCKOUT_MATCHES, TEAM_FLAGS } from "@/app/data/worldcup";
 
 interface Props { player: Player; }
 
@@ -24,7 +24,17 @@ export default function FixturesView({ player }: Props) {
   const now = new Date();
   const in96h = new Date(now.getTime() + 96 * 60 * 60 * 1000);
 
-  const upcoming = GROUP_MATCHES.filter(m => {
+  // Combine group and R32 knockout matches into a unified list
+  const r32Matches = (KNOCKOUT_MATCHES.r32 || []).map(m => ({
+    id: m.id, dateUK: m.dateUK, timeUK: m.timeUK,
+    home: { team: m.placeholder.split(" vs ")[0] || "TBD", flag: "" },
+    away: { team: m.placeholder.split(" vs ")[1] || "TBD", flag: "" },
+    group: "R32" as const,
+  }));
+
+  const allMatches = [...GROUP_MATCHES, ...r32Matches];
+
+  const upcoming = allMatches.filter(m => {
     const ko = parseKickoff(m.dateUK, m.timeUK);
     return ko >= now && ko <= in96h;
   });
@@ -66,7 +76,7 @@ export default function FixturesView({ player }: Props) {
               return (
                 <div key={m.id} className="card" style={{ padding: "12px 14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-3)" }}>Group {m.group} · {m.stadium}, {m.city}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-3)" }}>{"stadium" in m ? `Group ${m.group} · ${(m as {stadium:string}).stadium}, ${(m as {city:string}).city}` : `Round of 32 · ${m.group}`}</span>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: isLive ? "#ef4444" : diffH < 3 ? "#f59e0b" : "var(--text-3)", background: isLive ? "#fee2e2" : "transparent", padding: isLive ? "1px 6px" : "0", borderRadius: "4px" }}>
                       {isLive ? "🔴 LIVE" : `${m.timeUK} · ${diffH < 24 ? `${diffH}h` : diffH < 48 ? "tomorrow" : date}`}
                     </span>
