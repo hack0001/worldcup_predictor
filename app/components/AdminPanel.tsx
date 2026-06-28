@@ -1163,6 +1163,112 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 )}
               </div>
 
+              {/* Knockout Predictions - editable */}
+              {(() => {
+                const months: Record<string,number> = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+                const parseKO = (d: string, t: string) => {
+                  const [day,mon]=d.split(" "); const [hh,mm]=t.replace(/ BST| GMT/,"").split(":");
+                  return new Date(Date.UTC(2026,months[mon],+day,+hh-(t.includes("BST")?1:0),+mm));
+                };
+                const rounds: {key: "r32"|"r16"|"qf"|"sf"|"final"; label: string}[] = [
+                  {key:"r32",label:"Round of 32"},{key:"r16",label:"Round of 16"},
+                  {key:"qf",label:"Quarter Finals"},{key:"sf",label:"Semi Finals"},{key:"final",label:"Final"},
+                ];
+                const koPreds = viewingUser.knockoutPredictions || {};
+                const allKoMatches = rounds.flatMap(r => (KNOCKOUT_MATCHES[r.key]||[]).map(m => ({...m, roundLabel: r.label})));
+                const now = new Date();
+                return (
+                  <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <p style={{ fontWeight: 700, fontSize: "13px" }}>
+                        ⚔️ Knockout Predictions ({Object.keys(koPreds).length} filled)
+                      </p>
+                      <button className="btn-secondary" style={{ fontSize: "11px" }} onClick={async () => {
+                        if (!confirm(`Auto-fill all missing knockout predictions for ${viewingUser.name} with 1-1?`)) return;
+                        const newPreds = { ...koPreds };
+                        allKoMatches.forEach(m => {
+                          const ph = (m as {placeholder?:string}).placeholder;
+                          const home = ph ? ph.split(" vs ")[0] : (m as {homeTeam?:string}).homeTeam || "";
+                          const away = ph ? ph.split(" vs ")[1] : (m as {awayTeam?:string}).awayTeam || "";
+                          if (home && away && !newPreds[m.id]) {
+                            newPreds[m.id] = { homeTeam: home, awayTeam: away, homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                          }
+                        });
+                        const updated = { ...viewingUser, knockoutPredictions: newPreds };
+                        await savePlayer(updated);
+                        setViewingUser(updated);
+                        setUsers(prev => prev.map(u => u.id===updated.id ? updated : u));
+                      }}>⚡ Auto-fill all</button>
+                    </div>
+                    <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Click scores to override. Only shows matches with confirmed teams.</p>
+                    {rounds.map(({key, label}) => {
+                      const matches = (KNOCKOUT_MATCHES[key]||[]).filter(m => {
+                        const home = (m as {placeholder?:string}).placeholder?.split(" vs ")[0] || (m as {homeTeam?:string}).homeTeam;
+                        return !!home;
+                      });
+                      if (!matches.length) return null;
+                      return (
+                        <div key={key} style={{ marginBottom: "10px" }}>
+                          <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "5px" }}>{label.toUpperCase()}</p>
+                          {matches.map(m => {
+                            const ph = (m as {placeholder?:string}).placeholder;
+                            const homeTeam = ph ? ph.split(" vs ")[0] : (m as {homeTeam?:string}).homeTeam || "TBD";
+                            const awayTeam = ph ? ph.split(" vs ")[1] : (m as {awayTeam?:string}).awayTeam || "TBD";
+                            const pred = koPreds[m.id];
+                            const ko = parseKO(m.dateUK, m.timeUK);
+                            const locked = ko <= now;
+                            const diffH = Math.round((ko.getTime()-now.getTime())/3600000);
+                            const needsAutoFill = !pred && diffH <= 4 && diffH > -120;
+                            return (
+                              <div key={m.id} style={{ display: "flex", gap: "6px", alignItems: "center", padding: "5px 0", borderBottom: "1px solid var(--border)", background: needsAutoFill ? "#fef9c3" : "transparent" }}>
+                                <div style={{ flex: 1, fontSize: "11px", textAlign: "right", color: "var(--text-2)" }}>{homeTeam}</div>
+                                <input type="text" inputMode="numeric" maxLength={2}
+                                  value={pred?.homeScore ?? ""}
+                                  disabled={locked}
+                                  onChange={e => {
+                                    const val = e.target.value.replace(/[^0-9]/g,"");
+                                    const cur = koPreds[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
+                                    setViewingUser(u => u ? {...u, knockoutPredictions:{...u.knockoutPredictions,[m.id]:{...cur,homeScore:val}}} : u);
+                                  }}
+                                  style={{ width:36, textAlign:"center", fontWeight:800, fontSize:"14px", padding:"3px 2px", border:`2px solid ${pred ? "var(--green)" : "var(--border)"}`, borderRadius:"4px" }} />
+                                <span style={{ fontSize:"11px", color:"var(--text-3)" }}>–</span>
+                                <input type="text" inputMode="numeric" maxLength={2}
+                                  value={pred?.awayScore ?? ""}
+                                  disabled={locked}
+                                  onChange={e => {
+                                    const val = e.target.value.replace(/[^0-9]/g,"");
+                                    const cur = koPreds[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
+                                    setViewingUser(u => u ? {...u, knockoutPredictions:{...u.knockoutPredictions,[m.id]:{...cur,awayScore:val}}} : u);
+                                  }}
+                                  style={{ width:36, textAlign:"center", fontWeight:800, fontSize:"14px", padding:"3px 2px", border:`2px solid ${pred ? "var(--green)" : "var(--border)"}`, borderRadius:"4px" }} />
+                                <div style={{ flex:1, fontSize:"11px", color:"var(--text-2)" }}>{awayTeam}</div>
+                                {needsAutoFill && <span style={{ fontSize:"9px", color:"#92400e", background:"#fde047", padding:"1px 5px", borderRadius:"3px", flexShrink:0 }}>⚠️ &lt;4h</span>}
+                                {pred && (
+                                  <button onClick={async () => {
+                                    const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: { ...pred, homeScore: viewingUser.knockoutPredictions[m.id]?.homeScore ?? pred.homeScore, awayScore: viewingUser.knockoutPredictions[m.id]?.awayScore ?? pred.awayScore } } };
+                                    await savePlayer(updated);
+                                    setUsers(prev => prev.map(u => u.id===updated.id ? updated : u));
+                                  }} style={{ fontSize:"11px", padding:"3px 8px", borderRadius:"5px", border:"none", background:"var(--green)", color:"white", cursor:"pointer", flexShrink:0, fontWeight:700 }}>✓</button>
+                                )}
+                                {!pred && !locked && (
+                                  <button onClick={async () => {
+                                    const newPred = {homeTeam,awayTeam,homeScore:"1",awayScore:"1",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
+                                    const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: newPred } };
+                                    await savePlayer(updated);
+                                    setViewingUser(updated);
+                                    setUsers(prev => prev.map(u => u.id===updated.id ? updated : u));
+                                  }} style={{ fontSize:"11px", padding:"3px 8px", borderRadius:"5px", border:"none", background:"#f59e0b", color:"white", cursor:"pointer", flexShrink:0, fontWeight:700 }}>⚡</button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               {/* Fantasy squad - editable */}
               <div className="card" style={{ padding: "14px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
