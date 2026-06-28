@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
-import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage } from "@/lib/storage";
+import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage, getAllLeagues } from "@/lib/storage";
 import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm, bustFormCache } from "@/lib/footballApi";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
@@ -411,11 +411,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                 onClick={async () => {
                   if (!confirm(`Send to all leagues: "${msg.substring(0,60)}..."`)) return;
                   // Send to all known league IDs + no league
-                  const leagues = await (await import("@/lib/storage")).getAllLeagues();
+                  const leagues = await getAllLeagues();
                   for (const l of leagues) {
-                    await sendMessage("admin", `📢 Admin: ${msg}`, "", "", l.id);
+                    await sendMessage("admin", `📢 ${msg}`, "", "", l.id);
                   }
-                  await sendMessage("admin", `📢 Admin: ${msg}`);
                   alert("Sent!");
                 }}>
                 {msg.substring(0, 80)}…
@@ -1706,6 +1705,59 @@ export default function AdminPanel({ adminState, onUpdate, onClose }: Props) {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Knockout R32 predictions */}
+            <div style={{ marginTop: "20px" }}>
+              <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚔️ Round of 32 Predictions</p>
+              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R32 matches — shows who hasn't entered knockout predictions yet</p>
+              <div style={{ display: "grid", gap: "10px" }}>
+                {(KNOCKOUT_MATCHES.r32 || []).sort((a, b) => parseKO(a.dateUK, a.timeUK).getTime() - parseKO(b.dateUK, b.timeUK).getTime()).map(m => {
+                  const [home, away] = m.placeholder.split(" vs ");
+                  const ko = parseKO(m.dateUK, m.timeUK);
+                  const kicked = ko <= now;
+                  const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
+                  const missing = users.filter(u => {
+                    const p = u.knockoutPredictions?.[m.id];
+                    return !p?.homeScore && !p?.awayScore;
+                  });
+                  const done = users.filter(u => {
+                    const p = u.knockoutPredictions?.[m.id];
+                    return p?.homeScore !== undefined && p?.homeScore !== "";
+                  });
+                  return (
+                    <div key={m.id} className="card" style={{ padding: "14px 16px", borderLeft: `3px solid ${kicked ? "#d1d5db" : diffH < 3 ? "#ef4444" : "#3b82f6"}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: "14px" }}>{home} vs {away}</p>
+                          <p style={{ fontSize: "11px", color: "var(--text-3)" }}>R32 · {m.dateUK} {m.timeUK} {kicked ? "· 🔒 Kicked off" : `· ${diffH}h away`}</p>
+                        </div>
+                        <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700, flexShrink: 0 }}>✓ {done.length}</span>
+                      </div>
+                      {missing.length > 0 ? (
+                        <div>
+                          <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px" }}>Missing ({missing.length}):</p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                            {missing.map(u => (
+                              <span key={u.id} style={{ fontSize: "11px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", color: "#991b1b", fontWeight: 600 }}>{u.name}</span>
+                            ))}
+                          </div>
+                          {done.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                              {done.map(u => {
+                                const p = u.knockoutPredictions[m.id];
+                                return <span key={u.id} style={{ fontSize: "11px", background: "var(--green-light)", borderRadius: "99px", padding: "2px 8px", color: "var(--green)", fontWeight: 600 }}>{u.name}: {p.homeScore}–{p.awayScore}</span>;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✅ All {done.length} players predicted</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         );
