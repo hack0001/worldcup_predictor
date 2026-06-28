@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Player, FantasySquad, PlayerStat, FANTASY_POINTS } from "@/app/data/types";
 import { calculateFantasyPoints } from "@/lib/storage";
 import { SQUADS, TEAM_FLAGS } from "@/app/data/worldcup";
@@ -28,6 +29,7 @@ const medals = ["🥇", "🥈", "🥉"];
 const podiumColors = ["#f59e0b", "#94a3b8", "#c97c47"];
 
 export default function FantasyLeaderboard({ players, squads, stats, currentPlayerId }: Props) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const POS_ORDER: Record<string, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
 
   // Look up position from SQUADS data if not stored on the player
@@ -87,7 +89,8 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
             const isMe = player.id === currentPlayerId;
             const isTop3 = idx < 3;
             return (
-              <div key={player.id} className="card" style={{ padding: "14px 18px", borderColor: isMe ? "var(--green)" : undefined, background: isMe ? "#f0fdf4" : undefined }}>
+              <div key={player.id} className="card" style={{ padding: "14px 18px", borderColor: isMe ? "var(--green)" : undefined, background: isMe ? "#f0fdf4" : undefined, cursor: "pointer" }}
+                onClick={() => setExpandedId(expandedId === player.id ? null : player.id)}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   {/* Rank */}
                   <div style={{ width: "32px", textAlign: "center", flexShrink: 0 }}>
@@ -102,28 +105,67 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                       {isMe && <span className="badge" style={{ background: "var(--green-light)", color: "var(--green)", fontSize: "10px" }}>YOU</span>}
                     </div>
                     <p style={{ fontSize: "12px", color: "var(--text-2)" }}>{player.teamName}</p>
-                    {squad && (
-                      <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
-                        {[...squad.squad].sort((a, b) => {
-                          return (POS_ORDER[getPosition(a.name, a.position)] ?? 4) - (POS_ORDER[getPosition(b.name, b.position)] ?? 4);
-                        }).map(p => {
-                          const pos = getPosition(p.name, p.position);
-                          return (
-                          <span key={p.name} style={{ fontSize: "11px", background: POSITION_COLORS[pos] + "15", color: POSITION_COLORS[pos], border: `1px solid ${POSITION_COLORS[pos]}33`, borderRadius: "4px", padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                            <FlagImg country={p.country} size={12} /> {p.name}
-                          </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {!squad && <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "4px" }}>No squad picked yet</p>}
+                    <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "2px" }}>{squad?.squad?.length || 0}/11 players · tap for breakdown</p>
                   </div>
                   {/* Points */}
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: "26px", fontWeight: 800, color: isTop3 ? podiumColors[idx] : "var(--text)", lineHeight: 1 }}>{points}</div>
                     <div style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, textTransform: "uppercase" }}>pts</div>
+                    <div style={{ fontSize: "12px", color: "var(--text-3)", marginTop: "2px" }}>{expandedId === player.id ? "▲" : "▼"}</div>
                   </div>
                 </div>
+
+                {/* Expanded breakdown */}
+                {expandedId === player.id && squad && (
+                  <div style={{ marginTop: "12px", borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-3)", fontSize: "10px" }}>
+                          <th style={{ padding: "4px 6px", textAlign: "left", fontWeight: 600 }}>Player</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center" }}>⚽</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center" }}>🅰️</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center" }}>🟨</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center" }}>Mins</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center", fontWeight: 800, color: "var(--green)" }}>Pts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...squad.squad].sort((a, b) => (POS_ORDER[getPosition(a.name, a.position)] ?? 4) - (POS_ORDER[getPosition(b.name, b.position)] ?? 4)).map(fp => {
+                          const pos = getPosition(fp.name, fp.position);
+                          const playerStats = stats.filter(s => s.playerName === fp.name);
+                          let pts = 0, goals = 0, assists = 0, yellows = 0, mins = 0;
+                          for (const s of playerStats) {
+                            goals += s.goals; assists += s.assists; yellows += s.yellowCards; mins += s.minutesPlayed;
+                            const gPts = pos === "FWD" ? FANTASY_POINTS.GOAL_FWD : pos === "MID" ? FANTASY_POINTS.GOAL_MID : FANTASY_POINTS.GOAL_DEF;
+                            pts += s.goals * gPts + s.assists * FANTASY_POINTS.ASSIST + s.yellowCards * FANTASY_POINTS.YELLOW_CARD + s.redCards * FANTASY_POINTS.RED_CARD;
+                            if ((pos === "GK" || pos === "DEF") && s.cleanSheets) pts += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF;
+                            if (pos === "MID" && s.cleanSheets) pts += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_MID;
+                            if (pos === "GK" && s.saves) pts += Math.floor(s.saves / 3) * FANTASY_POINTS.SAVE_SET;
+                            if (s.minutesPlayed >= 60) pts += FANTASY_POINTS.PLAYED_60;
+                            else if (s.minutesPlayed > 0) pts += FANTASY_POINTS.PLAYED_SUB_60;
+                          }
+                          const posColor = POSITION_COLORS[pos] || "var(--text-3)";
+                          return (
+                            <tr key={fp.name} style={{ borderBottom: "1px solid var(--border)" }}>
+                              <td style={{ padding: "5px 6px", fontWeight: 600 }}>
+                                <span style={{ fontSize: "9px", fontWeight: 800, color: posColor, marginRight: 4, background: posColor + "15", padding: "1px 4px", borderRadius: 3 }}>{pos}</span>
+                                <FlagImg country={fp.country} size={12} /> {fp.name}
+                              </td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", color: goals ? "var(--green)" : "var(--text-3)" }}>{goals || "–"}</td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", color: assists ? "#3b82f6" : "var(--text-3)" }}>{assists || "–"}</td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", color: yellows ? "#f59e0b" : "var(--text-3)" }}>{yellows || "–"}</td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", color: "var(--text-3)" }}>{mins || "–"}</td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", fontWeight: 900, color: pts > 0 ? "var(--green)" : pts < 0 ? "#ef4444" : "var(--text-3)" }}>{pts > 0 ? `+${pts}` : pts || "–"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {expandedId === player.id && !squad && (
+                  <p style={{ marginTop: "10px", fontSize: "12px", color: "var(--text-3)", borderTop: "1px solid var(--border)", paddingTop: "10px" }}>No squad selected yet</p>
+                )}
               </div>
             );
           })}

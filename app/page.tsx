@@ -41,21 +41,40 @@ export default function App() {
   const [playerStats, setPlayerStats] = useState<Awaited<ReturnType<typeof getAllPlayerStats>>>([]);
   const [section, setSection] = useState<Section>("home");
   const [predTab, setPredTab] = useState<PredTab>("board");
-  const [unreadChat, setUnreadChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [fanTab, setFanTab] = useState<FanTab>("squad");
 
-  // Check for unread messages when not on chat tab
+  // Track unread messages — count messages newer than last read, filtered by current league
   useEffect(() => {
-    if (section !== "predictions" || predTab === "chat") { setUnreadChat(false); return; }
-    const lastRead = localStorage.getItem(`chat_read_${currentPlayer?.id}`);
+    if (!currentPlayer?.id || !currentLeague?.id) return;
+    const storageKey = `chat_read_${currentPlayer.id}_${currentLeague.id}`;
     const checkUnread = async () => {
-      const { data } = await supabase.from("messages").select("id").order("created_at", { ascending: false }).limit(1);
-      if (data?.[0] && data[0].id !== lastRead) setUnreadChat(true);
+      // If on chat tab, mark all as read and reset count
+      if (section === "predictions" && predTab === "chat") {
+        const { data } = await supabase.from("messages").select("id").eq("league_id", currentLeague.id).order("created_at", { ascending: false }).limit(1);
+        if (data?.[0]) localStorage.setItem(storageKey, data[0].id);
+        setUnreadCount(0);
+        return;
+      }
+      const lastReadId = localStorage.getItem(storageKey);
+      if (!lastReadId) {
+        // Never read — count all
+        const { count } = await supabase.from("messages").select("id", { count: "exact", head: true }).eq("league_id", currentLeague.id);
+        setUnreadCount(count || 0);
+        return;
+      }
+      // Count messages newer than lastReadId
+      const { data: lastMsg } = await supabase.from("messages").select("created_at").eq("id", lastReadId).single();
+      if (!lastMsg) { setUnreadCount(0); return; }
+      const { count } = await supabase.from("messages").select("id", { count: "exact", head: true })
+        .eq("league_id", currentLeague.id)
+        .gt("created_at", lastMsg.created_at);
+      setUnreadCount(count || 0);
     };
     checkUnread();
-    const interval = setInterval(checkUnread, 30000);
+    const interval = setInterval(checkUnread, 20000);
     return () => clearInterval(interval);
-  }, [section, predTab, currentPlayer?.id]);
+  }, [section, predTab, currentPlayer?.id, currentLeague?.id]);
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdmin, setShowAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -243,7 +262,7 @@ export default function App() {
         {/* Tabs inside header */}
         <div style={{ display: "flex", gap: "2px", overflowX: "auto", paddingBottom: "0" }}>
           {PRED_TABS.map(t => (
-            <button key={t.id} onClick={() => { setPredTab(t.id as PredTab); if (t.id === "chat") setUnreadChat(false); }} style={{
+            <button key={t.id} onClick={() => setPredTab(t.id as PredTab)} style={{
               padding: "8px 12px", fontSize: "12px", fontWeight: predTab === t.id ? 800 : 500,
               border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
               background: predTab === t.id ? "var(--bg)" : "transparent",
@@ -252,8 +271,10 @@ export default function App() {
               position: "relative",
             }}>
               {t.emoji} {t.label}
-              {t.id === "chat" && unreadChat && (
-                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid white" }} />
+              {t.id === "chat" && unreadCount > 0 && (
+                <span style={{ position: "absolute", top: 2, right: 2, minWidth: 18, height: 18, borderRadius: "99px", background: "#ef4444", border: "2px solid white", color: "white", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
               )}
             </button>
           ))}
