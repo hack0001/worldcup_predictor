@@ -32,10 +32,11 @@ function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
   const [sv, setSv] = useState(matchStat?.saves ?? 0);
   const [m, setM] = useState(matchStat?.minutesPlayed ?? 0);
   const [cs, setCs] = useState(matchStat?.cleanSheets ?? 0);
+  const [og, setOg] = useState(matchStat?.ownGoals ?? 0);
   const [saving, setSaving] = useState(false);
   // Reset when match changes
   useState(() => { setG(matchStat?.goals??0); setA(matchStat?.assists??0); setY(matchStat?.yellowCards??0); setR(matchStat?.redCards??0); setSv(matchStat?.saves??0); setM(matchStat?.minutesPlayed??0); setCs(matchStat?.cleanSheets??0); });
-  const isDirty = g!==(matchStat?.goals??0)||a!==(matchStat?.assists??0)||y!==(matchStat?.yellowCards??0)||r!==(matchStat?.redCards??0)||sv!==(matchStat?.saves??0)||m!==(matchStat?.minutesPlayed??0)||cs!==(matchStat?.cleanSheets??0);
+  const isDirty = g!==(matchStat?.goals??0)||a!==(matchStat?.assists??0)||y!==(matchStat?.yellowCards??0)||r!==(matchStat?.redCards??0)||sv!==(matchStat?.saves??0)||m!==(matchStat?.minutesPlayed??0)||cs!==(matchStat?.cleanSheets??0)||og!==(matchStat?.ownGoals??0);
   const inp = (val: number, set: (n: number) => void, max = 20) => (
     <td style={{ padding: "3px 2px" }}>
       <input type="number" min={0} max={max} value={val} onChange={e => set(Math.max(0, +e.target.value))}
@@ -48,11 +49,11 @@ function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
         <span style={{ fontSize: "10px", color: "var(--text-3)", marginRight: 4 }}>{player.position}</span>
         {player.name}
       </td>
-      {inp(g, setG)} {inp(a, setA)} {inp(y, setY, 3)} {inp(r, setR, 1)} {inp(sv, setSv)} {inp(m, setM, 120)} {inp(cs, setCs)}
+      {inp(g, setG)} {inp(a, setA)} {inp(y, setY, 3)} {inp(r, setR, 1)} {inp(sv, setSv)} {inp(m, setM, 120)} {inp(cs, setCs)} {inp(og, setOg, 3)}
       <td style={{ padding: "3px 4px" }}>
         <button onClick={async () => {
           setSaving(true);
-          await onSave({ id: matchStat?.id || `${player.name}-${matchId}`, playerName: player.name, country: player.country, goals: g, assists: a, yellowCards: y, redCards: r, saves: sv, minutesPlayed: m, cleanSheets: cs, round: "group", matchId, matchLabel });
+          await onSave({ id: matchStat?.id || `${player.name}-${matchId}`, playerName: player.name, country: player.country, goals: g, assists: a, yellowCards: y, redCards: r, saves: sv, minutesPlayed: m, cleanSheets: cs, ownGoals: og, round: "group", matchId, matchLabel });
           setSaving(false);
         }} style={{ fontSize: "11px", padding: "3px 8px", borderRadius: 5, border: "none", background: isDirty ? "var(--green)" : "var(--border)", color: isDirty ? "white" : "var(--text-3)", cursor: isDirty ? "pointer" : "default", fontWeight: 700 }}>
           {saving ? "…" : "✓"}
@@ -243,7 +244,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
       goals: parseInt(newStat.goals) || 0, assists: parseInt(newStat.assists) || 0,
       cleanSheets: parseInt(newStat.cleanSheets) || 0, yellowCards: parseInt(newStat.yellowCards) || 0,
       redCards: parseInt(newStat.redCards) || 0, saves: parseInt(newStat.saves) || 0,
-      minutesPlayed: parseInt(newStat.minutesPlayed) || 0, round: newStat.round,
+      minutesPlayed: parseInt(newStat.minutesPlayed) || 0, ownGoals: 0, round: newStat.round,
     };
     try {
       await savePlayerStat(stat);
@@ -856,7 +857,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                         yellowCards: s.yellowCards, redCards: s.redCards,
                         minutesPlayed: s.minutesPlayed,
                         cleanSheets: existing?.cleanSheets||0, saves: existing?.saves||0,
-                        round: "group",
+                        ownGoals: existing?.ownGoals||0, round: "group",
                       };
                       await savePlayerStat(stat);
                     }
@@ -948,6 +949,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                             <th style={{ padding: "6px 4px", textAlign: "center" }}>Saves</th>
                             <th style={{ padding: "6px 4px", textAlign: "center" }}>Mins</th>
                             <th style={{ padding: "6px 4px", textAlign: "center" }}>CS</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "#ef4444" }}>OG</th>
                             <th style={{ padding: "6px 4px", width: 40 }}></th>
                           </tr>
                         </thead>

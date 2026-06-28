@@ -127,7 +127,7 @@ export async function getAllPlayerStats(): Promise<PlayerStat[]> {
     goals: (d.goals as number) || 0, assists: (d.assists as number) || 0,
     cleanSheets: (d.clean_sheets as number) || 0, yellowCards: (d.yellow_cards as number) || 0,
     redCards: (d.red_cards as number) || 0, saves: (d.saves as number) || 0,
-    minutesPlayed: (d.minutes_played as number) || 0, round: d.round as string,
+    minutesPlayed: (d.minutes_played as number) || 0, ownGoals: (d.own_goals as number) || 0, round: d.round as string,
     matchId: d.match_id as string || undefined,
     matchLabel: d.match_label as string || undefined,
   }));
@@ -141,7 +141,7 @@ export async function savePlayerStat(stat: PlayerStat): Promise<void> {
       id: stat.id, player_name: stat.playerName, country: stat.country,
       goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
       yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
-      minutes_played: stat.minutesPlayed, round: stat.round,
+      minutes_played: stat.minutesPlayed, own_goals: stat.ownGoals || 0, round: stat.round,
       match_id: stat.matchId, match_label: stat.matchLabel || "",
     }, { onConflict: "player_name,match_id" });
     if (error) console.error("Upsert error:", error.message, error.code);
@@ -152,7 +152,7 @@ export async function savePlayerStat(stat: PlayerStat): Promise<void> {
       id: stat.id, player_name: stat.playerName, country: stat.country,
       goals: stat.goals, assists: stat.assists, clean_sheets: stat.cleanSheets,
       yellow_cards: stat.yellowCards, red_cards: stat.redCards, saves: stat.saves,
-      minutes_played: stat.minutesPlayed, round: stat.round,
+      minutes_played: stat.minutesPlayed, own_goals: stat.ownGoals || 0, round: stat.round,
     });
     if (insErr) console.error("Insert error:", insErr.message, insErr.code);
   }
@@ -346,6 +346,7 @@ export function calculateFantasyPoints(squad: FantasySquad, stats: PlayerStat[])
       total += s.yellowCards * FANTASY_POINTS.YELLOW_CARD;
       total += s.redCards * FANTASY_POINTS.RED_CARD;
       if (fp.position === "GK") total += Math.floor(s.saves / 3) * FANTASY_POINTS.SAVE_SET;
+      if (s.ownGoals) total += s.ownGoals * FANTASY_POINTS.OWN_GOAL;
       if (s.minutesPlayed >= 60) total += FANTASY_POINTS.PLAYED_60;
       else if (s.minutesPlayed > 0) total += FANTASY_POINTS.PLAYED_SUB_60;
     }

@@ -126,6 +126,7 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                           <th style={{ padding: "4px 4px", textAlign: "center" }}>🅰️</th>
                           <th style={{ padding: "4px 4px", textAlign: "center" }}>🟨</th>
                           <th style={{ padding: "4px 4px", textAlign: "center" }}>Mins</th>
+                          <th style={{ padding: "4px 4px", textAlign: "center", color: "#ef4444" }}>OG</th>
                           <th style={{ padding: "4px 4px", textAlign: "center", fontWeight: 800, color: "var(--green)" }}>Pts</th>
                         </tr>
                       </thead>
@@ -133,14 +134,15 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                         {[...squad.squad].sort((a, b) => (POS_ORDER[getPosition(a.name, a.position)] ?? 4) - (POS_ORDER[getPosition(b.name, b.position)] ?? 4)).map(fp => {
                           const pos = getPosition(fp.name, fp.position);
                           const playerStats = stats.filter(s => s.playerName === fp.name);
-                          let pts = 0, goals = 0, assists = 0, yellows = 0, mins = 0;
+                          let pts = 0, goals = 0, assists = 0, yellows = 0, mins = 0, ogs = 0;
                           for (const s of playerStats) {
-                            goals += s.goals; assists += s.assists; yellows += s.yellowCards; mins += s.minutesPlayed;
+                            goals += s.goals; assists += s.assists; yellows += s.yellowCards; mins += s.minutesPlayed; ogs += s.ownGoals || 0;
                             const gPts = pos === "FWD" ? FANTASY_POINTS.GOAL_FWD : pos === "MID" ? FANTASY_POINTS.GOAL_MID : FANTASY_POINTS.GOAL_DEF;
                             pts += s.goals * gPts + s.assists * FANTASY_POINTS.ASSIST + s.yellowCards * FANTASY_POINTS.YELLOW_CARD + s.redCards * FANTASY_POINTS.RED_CARD;
                             if ((pos === "GK" || pos === "DEF") && s.cleanSheets) pts += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_GK_DEF;
                             if (pos === "MID" && s.cleanSheets) pts += s.cleanSheets * FANTASY_POINTS.CLEAN_SHEET_MID;
                             if (pos === "GK" && s.saves) pts += Math.floor(s.saves / 3) * FANTASY_POINTS.SAVE_SET;
+                            if (s.ownGoals) pts += s.ownGoals * FANTASY_POINTS.OWN_GOAL;
                             if (s.minutesPlayed >= 60) pts += FANTASY_POINTS.PLAYED_60;
                             else if (s.minutesPlayed > 0) pts += FANTASY_POINTS.PLAYED_SUB_60;
                           }
@@ -155,6 +157,7 @@ export default function FantasyLeaderboard({ players, squads, stats, currentPlay
                               <td style={{ padding: "5px 4px", textAlign: "center", color: assists ? "#3b82f6" : "var(--text-3)" }}>{assists || "–"}</td>
                               <td style={{ padding: "5px 4px", textAlign: "center", color: yellows ? "#f59e0b" : "var(--text-3)" }}>{yellows || "–"}</td>
                               <td style={{ padding: "5px 4px", textAlign: "center", color: "var(--text-3)" }}>{mins || "–"}</td>
+                              <td style={{ padding: "5px 4px", textAlign: "center", color: ogs ? "#ef4444" : "var(--text-3)" }}>{ogs || "–"}</td>
                               <td style={{ padding: "5px 4px", textAlign: "center", fontWeight: 900, color: pts > 0 ? "var(--green)" : pts < 0 ? "#ef4444" : "var(--text-3)" }}>{pts > 0 ? `+${pts}` : pts || "–"}</td>
                             </tr>
                           );

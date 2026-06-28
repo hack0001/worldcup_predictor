@@ -72,6 +72,7 @@ export interface PlayerStat {
   redCards: number;
   saves: number;
   minutesPlayed: number;
+  ownGoals: number;
   round: string;
   matchId?: string;       // e.g. "A-0-1"
   matchLabel?: string;    // e.g. "Mexico vs South Africa"

@@ -117,6 +117,14 @@ export default function App() {
     getAllFantasySquads().then(setFantasySquads);
   }, [currentLeague?.id]);
 
+  // Refresh fantasy stats when switching to the board tab — fires once per tab switch, not on every render
+  useEffect(() => {
+    if (fanTab === "board") {
+      getAllPlayerStats().then(setPlayerStats);
+      getAllFantasySquads().then(setFantasySquads);
+    }
+  }, [fanTab]);
+
   const handlePlayerSaved = (p: Player) => {
     setCurrentPlayer(p);
     localStorage.setItem("wc26_player", JSON.stringify(p));
@@ -323,17 +331,12 @@ export default function App() {
       </div>
       <div style={{ padding: "16px 16px 32px" }}>
         {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} fantasyLocked={adminState.fantasyLocked} />}
-        {fanTab === "board" && (() => {
-          // Refresh stats every time board is viewed
-          getAllPlayerStats().then(setPlayerStats);
-          getAllFantasySquads().then(setFantasySquads);
-          return <FantasyLeaderboard
-            players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
-            squads={fantasySquads}
-            stats={playerStats}
-            currentPlayerId={currentPlayer.id}
-          />;
-        })()}
+        {fanTab === "board" && <FantasyLeaderboard
+          players={leaguePlayers.some(p => p.id === currentPlayer.id) ? leaguePlayers : [...leaguePlayers, currentPlayer]}
+          squads={fantasySquads}
+          stats={playerStats}
+          currentPlayerId={currentPlayer.id}
+        />}
       </div>
     </div>
   );
