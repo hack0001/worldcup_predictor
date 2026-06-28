@@ -4,12 +4,15 @@ import { Player, KnockoutPrediction } from "@/app/data/types";
 import { KNOCKOUT_MATCHES, GROUPS } from "@/app/data/worldcup";
 import { savePlayer } from "@/lib/storage";
 import Flag from "./Flag";
+import { AvatarDisplay } from "./AvatarPicker";
 
 interface Props {
   player: Player;
   onUpdate: (player: Player) => void;
   readonly?: boolean;
   confirmedTeams?: Record<string, { home: string; away: string }>;
+  allPlayers?: Player[];
+  adminState?: { results: { knockout: Record<string, { homeScore?: string; awayScore?: string; homeTeam?: string; awayTeam?: string }> } };
 }
 
 const ROUND_TABS = [
@@ -28,7 +31,7 @@ const EMPTY_PRED: KnockoutPrediction = {
   goesToPens: false, penWinner: "",
 };
 
-export default function KnockoutPredictions({ player, onUpdate, readonly, confirmedTeams = {} }: Props) {
+export default function KnockoutPredictions({ player, onUpdate, readonly, confirmedTeams = {}, allPlayers = [], adminState }: Props) {
   const [activeRound, setActiveRound] = useState<RoundId>("r32");
   const [now, setNow] = useState(() => new Date());
 
@@ -209,6 +212,57 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
               {!hasTeams && (
                 <p style={{ fontSize: "10px", color: "var(--text-3)", textAlign: "center" }}>Unlocks when previous round results are entered</p>
               )}
+
+              {/* Everyone's predictions when locked */}
+              {locked && allPlayers.length > 0 && (() => {
+                const result = adminState?.results?.knockout?.[match.id];
+                const preds = allPlayers.filter(p => {
+                  const pr = p.knockoutPredictions?.[match.id];
+                  return pr?.homeScore !== undefined && pr?.homeScore !== "";
+                });
+                if (!preds.length && !result?.homeScore) return null;
+                const getOutcome = (h: string, a: string) => Number(h) > Number(a) ? "H" : Number(h) < Number(a) ? "A" : "D";
+                return (
+                  <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px dashed var(--border)" }}>
+                    {result?.homeScore && (
+                      <div style={{ textAlign: "center", marginBottom: "8px", padding: "6px", background: "#fef9c3", borderRadius: "8px", border: "1px solid #fde047" }}>
+                        <p style={{ fontSize: "10px", fontWeight: 700, color: "#854d0e", marginBottom: "1px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Final Score</p>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#713f12" }}>{result.homeTeam}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                            <input className="score-input" value={result.homeScore || "–"} readOnly disabled style={{ background: "#fef3c7", borderColor: "#f59e0b", color: "#92400e", fontWeight: 900, fontSize: "14px" }} />
+                            <span style={{ color: "#92400e" }}>–</span>
+                            <input className="score-input" value={result.awayScore || "–"} readOnly disabled style={{ background: "#fef3c7", borderColor: "#f59e0b", color: "#92400e", fontWeight: 900, fontSize: "14px" }} />
+                          </div>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#713f12" }}>{result.awayTeam}</span>
+                        </div>
+                      </div>
+                    )}
+                    {preds.length > 0 && (
+                      <>
+                        <p style={{ fontSize: "10px", color: "var(--text-3)", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Predictions</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                          {preds.map(p => {
+                            const pr = p.knockoutPredictions[match.id];
+                            const isMe = p.id === player.id;
+                            const correct = result?.homeScore && pr.homeScore === result.homeScore && pr.awayScore === result.awayScore;
+                            const correctResult = result?.homeScore && !correct && getOutcome(pr.homeScore, pr.awayScore) === getOutcome(result.homeScore!, result.awayScore!);
+                            const indicator = correct ? "✅" : result?.homeScore ? (correctResult ? "🟡" : "❌") : null;
+                            return (
+                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 8px", borderRadius: "8px", background: correct ? "#dcfce7" : isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${correct ? "#22c55e" : isMe ? "var(--green)" : "var(--border)"}` }}>
+                                <AvatarDisplay url={p.avatarUrl} name={p.name} size={18} />
+                                <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name.split(" ")[0]}</span>
+                                <span style={{ fontSize: "11px", fontWeight: 800, flexShrink: 0 }}>{pr.homeScore}–{pr.awayScore}</span>
+                                {indicator && <span style={{ fontSize: "11px", flexShrink: 0 }}>{indicator}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
