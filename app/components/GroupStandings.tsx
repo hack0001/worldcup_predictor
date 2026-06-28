@@ -249,6 +249,75 @@ export default function GroupStandings({ adminState }: Props) {
           Group {groupKeys[groupKeys.indexOf(activeGroup) + 1]} →
         </button>
       </div>
+
+      {/* Best third-place table */}
+      {(() => {
+        // Get all third-place teams and their stats
+        const thirds = Object.entries(GROUPS).map(([group, teams]) => {
+          const gMatches = GROUP_MATCHES.filter(m => m.group === group);
+          const allComplete = gMatches.every(m => results[m.id]?.home !== undefined && results[m.id]?.away !== undefined);
+          if (!allComplete) return null;
+          const teamStats: Record<string, {pts:number;gd:number;gf:number;ga:number;yc:number}> = {};
+          teams.forEach(t => teamStats[t.team] = {pts:0,gd:0,gf:0,ga:0,yc:0});
+          gMatches.forEach(m => {
+            const r = results[m.id]; if (!r) return;
+            const h = parseInt(r.home), a = parseInt(r.away);
+            if (isNaN(h)||isNaN(a)) return;
+            teamStats[m.home.team].gf+=h; teamStats[m.home.team].ga+=a; teamStats[m.home.team].gd+=h-a;
+            teamStats[m.away.team].gf+=a; teamStats[m.away.team].ga+=h; teamStats[m.away.team].gd+=a-h;
+            if (h>a){teamStats[m.home.team].pts+=3;}else if(h<a){teamStats[m.away.team].pts+=3;}else{teamStats[m.home.team].pts+=1;teamStats[m.away.team].pts+=1;}
+          });
+          const sorted = teams.map(t=>({team:t.team,...teamStats[t.team]})).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+          return {group, team: sorted[2]};
+        }).filter(Boolean) as {group:string;team:{team:string;pts:number;gd:number;gf:number;ga:number}}[];
+
+        if (thirds.length === 0) return null;
+
+        const sorted = [...thirds].sort((a,b)=>b.team.pts-a.team.pts||b.team.gd-a.team.gd||b.team.gf-a.team.gf);
+        const qualified = new Set(sorted.slice(0,8).map(t=>t.team.team));
+
+        return (
+          <div className="card" style={{ padding: "14px 16px", marginTop: "16px" }}>
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>🏅 Best Third-Place Teams</p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border)", background: "var(--surface2)" }}>
+                    <th style={{ padding: "5px 6px", textAlign: "left", width: 20 }}>#</th>
+                    <th style={{ padding: "5px 6px", textAlign: "left" }}>Team</th>
+                    <th style={{ padding: "5px 6px", textAlign: "center", fontWeight: 700 }}>Grp</th>
+                    <th style={{ padding: "5px 6px", textAlign: "center", fontWeight: 700 }}>Pts</th>
+                    <th style={{ padding: "5px 6px", textAlign: "center" }}>GD</th>
+                    <th style={{ padding: "5px 6px", textAlign: "center" }}>GF</th>
+                    <th style={{ padding: "5px 6px", textAlign: "center" }}>GA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(({group, team}, i) => {
+                    const q = qualified.has(team.team);
+                    return (
+                      <tr key={team.team} style={{ borderBottom: "1px solid var(--border)", background: q ? "var(--green-light)" : i >= 8 ? "#fee2e2" : "transparent" }}>
+                        <td style={{ padding: "5px 6px", fontWeight: 700, color: q ? "var(--green)" : "var(--text-3)" }}>{i+1}</td>
+                        <td style={{ padding: "5px 6px", fontWeight: 600, display: "flex", alignItems: "center", gap: "5px" }}>
+                          <Flag country={team.team} size={14} />
+                          {team.team}
+                          {q && <span style={{ fontSize: "9px", background: "var(--green)", color: "white", borderRadius: "3px", padding: "1px 4px", fontWeight: 700 }}>Q</span>}
+                        </td>
+                        <td style={{ padding: "5px 6px", textAlign: "center", color: "var(--text-3)" }}>{group}</td>
+                        <td style={{ padding: "5px 6px", textAlign: "center", fontWeight: 900 }}>{team.pts}</td>
+                        <td style={{ padding: "5px 6px", textAlign: "center", color: team.gd > 0 ? "var(--green)" : team.gd < 0 ? "#ef4444" : "var(--text-3)" }}>{team.gd > 0 ? `+${team.gd}` : team.gd}</td>
+                        <td style={{ padding: "5px 6px", textAlign: "center" }}>{team.gf}</td>
+                        <td style={{ padding: "5px 6px", textAlign: "center" }}>{team.ga}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {thirds.length < 12 && <p style={{ fontSize: "11px", color: "var(--text-3)", marginTop: "6px" }}>Showing {thirds.length}/12 groups — table updates as group results are entered</p>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
