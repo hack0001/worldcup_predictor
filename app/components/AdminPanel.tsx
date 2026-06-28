@@ -1641,13 +1641,15 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
           return new Date(Date.UTC(2026,months[mon],+day,+hh-(t.includes("BST")?1:0),+mm));
         };
         const upcoming = GROUP_MATCHES.filter(m => { const ko=parseKO(m.dateUK,m.timeUK); return ko>=now&&ko<=in96h; });
+        // Also include R32 knockout matches in next 96h
+        const r32Upcoming = (KNOCKOUT_MATCHES.r32||[]).filter(m => { const ko=parseKO(m.dateUK,m.timeUK); return ko>=now&&ko<=in96h; });
         const scores = [["1","1"],["2","1"],["1","2"]];
         return (
           <div>
             <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
               Matches in the next 96 hours · shows players who haven't predicted · click Auto-fill or fill all at once
             </p>
-            {upcoming.length === 0 && <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)" }}>No matches in next 96 hours</div>}
+            {upcoming.length === 0 && r32Upcoming.length === 0 && <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)" }}>No matches in next 96 hours</div>}
             <div style={{ display: "grid", gap: "10px" }}>
               {upcoming.map(m => {
                 const home = typeof m.home==="string"?m.home:(m.home as {team:string}).team;
@@ -1713,7 +1715,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             {/* Knockout R32 predictions */}
             <div style={{ marginTop: "20px" }}>
               <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚔️ Round of 32 Predictions</p>
-              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R32 matches — shows who hasn't entered knockout predictions yet</p>
+              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R32 matches — shows who hasn't entered knockout predictions yet · autofill uses 1-1 score</p>
               <div style={{ display: "grid", gap: "10px" }}>
                 {(KNOCKOUT_MATCHES.r32 || []).sort((a, b) => parseKO(a.dateUK, a.timeUK).getTime() - parseKO(b.dateUK, b.timeUK).getTime()).map(m => {
                   const [home, away] = m.placeholder.split(" vs ");
@@ -1736,13 +1738,33 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                           <p style={{ fontSize: "11px", color: "var(--text-3)" }}>R32 · {m.dateUK} {m.timeUK} {kicked ? "· 🔒 Kicked off" : `· ${diffH}h away`}</p>
                         </div>
                         <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700, flexShrink: 0 }}>✓ {done.length}</span>
+                        {missing.length > 0 && (
+                          <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px", flexShrink: 0 }}
+                            onClick={async () => {
+                              if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} missing player(s) with 1-1?`)) return;
+                              for (const u of missing) {
+                                const defaultPred = { homeTeam: home||"", awayTeam: away||"", homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                                const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
+                                await savePlayer(updated);
+                                setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                              }
+                            }}>⚡ Fill {missing.length}</button>
+                        )}
                       </div>
                       {missing.length > 0 ? (
                         <div>
                           <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px" }}>Missing ({missing.length}):</p>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
                             {missing.map(u => (
-                              <span key={u.id} style={{ fontSize: "11px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", color: "#991b1b", fontWeight: 600 }}>{u.name}</span>
+                              <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "2px", background: "#fee2e2", borderRadius: "99px", padding: "2px 6px 2px 8px" }}>
+                                <span style={{ fontSize: "11px", color: "#991b1b", fontWeight: 600 }}>{u.name}</span>
+                                <button onClick={async () => {
+                                  const defaultPred = { homeTeam: home||"", awayTeam: away||"", homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                                  const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
+                                  await savePlayer(updated);
+                                  setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                                }} style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, fontSize: "11px", padding: "0 2px", lineHeight: 1 }}>⚡</button>
+                              </div>
                             ))}
                           </div>
                           {done.length > 0 && (
