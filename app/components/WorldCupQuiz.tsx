@@ -56,6 +56,7 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [currentQ, setCurrentQ] = useState(0);
+  const [showQuiz1, setShowQuiz1] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -122,7 +123,8 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
   }, [currentQ, myAnswers]);
 
   const score = QUESTIONS.filter(q => myAnswers[q.id] === q.answer).length;
-  const answered = Object.keys(myAnswers).length;
+  const currentQIds = new Set(QUESTIONS.map(q => q.id));
+  const answered = QUESTIONS.filter(q => myAnswers[q.id] !== undefined).length;
 
   if (loading) return <div style={{ padding: "40px", textAlign: "center", color: "var(--text-3)" }}>Loading quiz...</div>;
 
@@ -139,12 +141,12 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <h2 style={{ fontSize: "17px", fontWeight: 800 }}>🧠 World Cup Quiz</h2>
           <span style={{ fontWeight: 700, fontSize: "14px", color: answered === QUESTIONS.length ? "var(--green)" : "var(--text-2)" }}>
-            {answered}/20 answered · {score} correct
+            {answered}/{QUESTIONS.length} answered · {score} correct
           </span>
         </div>
         {/* Progress bar */}
         <div style={{ background: "var(--border)", borderRadius: "99px", height: "6px", overflow: "hidden" }}>
-          <div style={{ background: "var(--green)", height: "100%", width: `${(answered / 20) * 100}%`, borderRadius: "99px", transition: "width 0.3s" }} />
+          <div style={{ background: "var(--green)", height: "100%", width: `${(answered / QUESTIONS.length) * 100}%`, borderRadius: "99px", transition: "width 0.3s" }} />
         </div>
       </div>
 
@@ -282,19 +284,63 @@ export default function WorldCupQuiz({ player, allPlayers }: Props) {
       {/* Final score if all done */}
       {answered === QUESTIONS.length && (
         <div className="card" style={{ marginTop: "16px", padding: "20px", textAlign: "center", borderColor: "var(--green)" }}>
-          <p style={{ fontSize: "32px", marginBottom: "8px" }}>{score >= 16 ? "🏆" : score >= 12 ? "⭐" : score >= 8 ? "😅" : "🤦"}</p>
-          <p style={{ fontWeight: 800, fontSize: "20px", marginBottom: "4px" }}>{score}/20</p>
+          <p style={{ fontSize: "32px", marginBottom: "8px" }}>{score >= 15 ? "🏆" : score >= 12 ? "⭐" : score >= 8 ? "😅" : "🤦"}</p>
+          <p style={{ fontWeight: 800, fontSize: "20px", marginBottom: "4px" }}>{score}/{QUESTIONS.length}</p>
           <p style={{ color: "var(--text-2)", fontSize: "13px" }}>
-            {score >= 16 ? "World Cup encyclopedia!" : score >= 12 ? "Solid football knowledge!" : score >= 8 ? "Room to improve..." : "Maybe stick to watching?"}
+            {score >= 15 ? "World Cup encyclopedia!" : score >= 12 ? "Solid football knowledge!" : score >= 8 ? "Room to improve..." : "Maybe stick to watching?"}
           </p>
         </div>
       )}
 
-      {/* Quiz Leaderboard — show once at least one person has answered something */}
+      {/* Quiz 1 history — collapsible */}
       {(() => {
-        // Build per-player scores from all answers
+        const quiz1Ids = new Set(["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12","q13","q14","q15","q16","q17","q18","q19","q20"]);
+        const quiz1Answers = Object.entries(answers).filter(([id]) => quiz1Ids.has(id)).flatMap(([,a]) => a);
+        if (!quiz1Answers.length) return null;
+        const q1Scores: Record<string, { name: string; correct: number; total: number }> = {};
+        quiz1Answers.forEach(a => {
+          if (!q1Scores[a.playerId]) q1Scores[a.playerId] = { name: a.playerName, correct: 0, total: 0 };
+          q1Scores[a.playerId].total++;
+          if (a.correct) q1Scores[a.playerId].correct++;
+        });
+        const q1Ranked = Object.values(q1Scores).sort((a, b) => b.correct - a.correct);
+        return (
+          <div style={{ marginTop: "16px" }}>
+            <button onClick={() => setShowQuiz1(s => !s)} className="btn-secondary" style={{ width: "100%", fontSize: "13px" }}>
+              {showQuiz1 ? "▲" : "▼"} Quiz 1 Results ({q1Ranked.length} players)
+            </button>
+            {showQuiz1 && (
+              <div className="card" style={{ marginTop: "8px", overflow: "hidden", padding: 0 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead><tr style={{ background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left" }}>#</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left" }}>Player</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center" }}>Score</th>
+                  </tr></thead>
+                  <tbody>{q1Ranked.map((p, i) => {
+                    const pl = allPlayers.find(u => u.name === p.name);
+                    return <tr key={p.name} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 700 }}>{["🥇","🥈","🥉"][i] || i+1}</td>
+                      <td style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <AvatarDisplay url={pl?.avatarUrl || ""} name={p.name} size={24} />
+                        {p.name}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 800 }}>{p.correct}/{p.total}</td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Quiz 2 Leaderboard — only current quiz answers */}
+      {(() => {
+        const currentQIds = new Set(QUESTIONS.map(q => q.id));
+        const currentAnswers = Object.entries(answers).filter(([id]) => currentQIds.has(id)).flatMap(([,a]) => a);
         const playerScores: Record<string, { name: string; playerId: string; correct: number; total: number }> = {};
-        Object.values(answers).flat().forEach(a => {
+        currentAnswers.forEach(a => {
           if (!playerScores[a.playerId]) playerScores[a.playerId] = { name: a.playerName, playerId: a.playerId, correct: 0, total: 0 };
           playerScores[a.playerId].total++;
           if (a.correct) playerScores[a.playerId].correct++;

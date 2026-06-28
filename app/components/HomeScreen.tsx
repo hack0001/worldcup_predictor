@@ -225,6 +225,13 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
               return <img src={`https://flagcdn.com/w20/${code}.png`} width={20} height={14} style={{ borderRadius: 2, flexShrink: 0, objectFit: "cover" }} alt="" />;
             };
             // Show ALL R32 matches in chronological order, unpredicted and not yet kicked off
+            // UK TV broadcaster per match (BBC/ITV split)
+            const TV: Record<string, string> = {
+              "r32-73":"BBC","r32-76":"ITV","r32-74":"BBC","r32-75":"ITV",
+              "r32-78":"BBC","r32-77":"ITV","r32-79":"BBC","r32-80":"ITV",
+              "r32-81":"BBC","r32-82":"ITV","r32-83":"BBC","r32-84":"ITV",
+              "r32-85":"BBC","r32-86":"ITV","r32-87":"BBC","r32-88":"ITV",
+            };
             const r32 = [...(KNOCKOUT_MATCHES.r32 || [])].sort((a, b) => {
               const ka = parseKickoff(a.dateUK, a.timeUK), kb = parseKickoff(b.dateUK, b.timeUK);
               return ka.getTime() - kb.getTime();
@@ -251,9 +258,15 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
                     const canSave = !locked && lk.home !== "" && lk.away !== "";
                     return (
                       <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${locked ? "#d1d5db" : diffH < 3 ? "#ef4444" : "#3b82f6"}`, opacity: locked ? 0.6 : 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", color: "var(--text-3)" }}>R32 · {m.city} · {m.dateUK}</span>
-                          <span style={{ fontSize: "11px", fontWeight: 700, color: locked ? "var(--text-3)" : diffH < 3 ? "#ef4444" : "#3b82f6" }}>{timeLabel}</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                          <div>
+                            <span style={{ fontSize: "11px", color: "var(--text-3)" }}>📍 {m.stadium}, {m.city}</span>
+                            <div style={{ display: "flex", gap: "6px", marginTop: "2px", alignItems: "center" }}>
+                              <span style={{ fontSize: "11px", color: "var(--text-3)" }}>🕐 {m.timeUK} · {m.dateUK}</span>
+                              {TV[m.id] && <span style={{ fontSize: "10px", fontWeight: 800, padding: "1px 6px", borderRadius: "3px", background: TV[m.id] === "BBC" ? "#e3051b" : "#f9c300", color: TV[m.id] === "BBC" ? "white" : "black" }}>{TV[m.id]}</span>}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: locked ? "var(--text-3)" : diffH < 3 ? "#ef4444" : "#3b82f6", flexShrink: 0, marginLeft: "8px" }}>{timeLabel}</span>
                         </div>
                         {/* Score row */}
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
