@@ -309,11 +309,24 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
         ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
         : (actualHomeScore > actualAwayScore ? actual.homeTeam : actual.awayTeam);
 
-    const predWinner = pred.goesToPens
-      ? pred.penWinner
-      : pred.goesToET
-        ? (parseInt(pred.etHomeScore) > parseInt(pred.etAwayScore) ? pred.homeTeam : pred.awayTeam)
-        : (parseInt(pred.homeScore) > parseInt(pred.awayScore) ? pred.homeTeam : pred.awayTeam);
+    const predWinner = (() => {
+      const ftH = parseInt(pred.homeScore), ftA = parseInt(pred.awayScore);
+      if (isNaN(ftH) || isNaN(ftA)) return null;
+      if (ftH !== ftA) {
+        // FT winner — no ET needed
+        return ftH > ftA ? pred.homeTeam : pred.awayTeam;
+      }
+      // FT draw — must have ET
+      if (!pred.goesToET) return null; // draw with no ET = incomplete prediction
+      const etH = parseInt(pred.etHomeScore), etA = parseInt(pred.etAwayScore);
+      if (isNaN(etH) || isNaN(etA)) return null; // ET scores not filled
+      if (etH !== etA) {
+        return etH > etA ? pred.homeTeam : pred.awayTeam;
+      }
+      // ET draw — must have pens
+      if (!pred.goesToPens || !pred.penWinner) return null; // pens not filled
+      return pred.penWinner;
+    })();
 
     if (winner && predWinner && winner === predWinner) {
       if (isEarly) add("Correct qualifier (R32/R16)", POINTS.EARLY_KO_CORRECT_QUALIFIER);

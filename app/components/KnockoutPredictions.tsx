@@ -163,9 +163,19 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                 </div>
               </div>
 
-              {/* ET + Pens */}
-              {hasTeams && (
+              {/* ET + Pens — only relevant when FT is a draw */}
+              {hasTeams && (() => {
+                const ftDraw = pred.homeScore !== "" && pred.awayScore !== "" && pred.homeScore === pred.awayScore;
+                // If score changed to non-draw, clear ET/pens
+                if (!ftDraw && (pred.goesToET || pred.goesToPens)) {
+                  update(match.id, { goesToET: false, goesToPens: false, penWinner: "" });
+                }
+                return (
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
+                  {!ftDraw && pred.homeScore !== "" && pred.awayScore !== "" && (
+                    <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✓ {Number(pred.homeScore) > Number(pred.awayScore) ? homeTeam : awayTeam} win — no ET needed</p>
+                  )}
+                  {ftDraw && (
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToET ? "8px" : 0 }}>
                     <input type="checkbox" checked={pred.goesToET} disabled={isDisabled}
                       onChange={e => update(match.id, { goesToET: e.target.checked, goesToPens: e.target.checked ? pred.goesToPens : false })}
@@ -173,6 +183,7 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                     Goes to extra time?
                     <span style={{ color: "var(--green)", fontWeight: 700, fontSize: "11px" }}>+8pts if correct</span>
                   </label>
+                  )}
 
                   {pred.goesToET && (
                     <div style={{ paddingLeft: "22px", display: "grid", gap: "8px" }}>
@@ -207,7 +218,8 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                     </div>
                   )}
                 </div>
-              )}
+                );
+              })()}
 
               {!hasTeams && (
                 <p style={{ fontSize: "10px", color: "var(--text-3)", textAlign: "center" }}>Unlocks when previous round results are entered</p>
