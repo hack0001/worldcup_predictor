@@ -165,51 +165,113 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
 
               {/* ET + Pens — only relevant when FT is a draw */}
               {hasTeams && (() => {
-                const ftDraw = pred.homeScore !== "" && pred.awayScore !== "" && pred.homeScore === pred.awayScore;
-                // If score changed to non-draw, clear ET/pens
+                const ftH = parseInt(pred.homeScore), ftA = parseInt(pred.awayScore);
+                const ftFilled = !isNaN(ftH) && !isNaN(ftA) && pred.homeScore !== "" && pred.awayScore !== "";
+                const ftDraw = ftFilled && ftH === ftA;
+                const ftWin = ftFilled && !ftDraw;
+
+                // ET validation
+                const etH = parseInt(pred.etHomeScore), etA = parseInt(pred.etAwayScore);
+                const etFilled = !isNaN(etH) && !isNaN(etA) && pred.etHomeScore !== "" && pred.etAwayScore !== "";
+                const etDraw = etFilled && etH === etA;
+
+                // ET scores can't be less than FT scores
+                const etHomeTooLow = etFilled && etH < ftH;
+                const etAwayTooLow = etFilled && etA < ftA;
+                const etInvalid = etHomeTooLow || etAwayTooLow;
+
+                // Auto-clear ET/pens if FT is no longer a draw
                 if (!ftDraw && (pred.goesToET || pred.goesToPens)) {
                   update(match.id, { goesToET: false, goesToPens: false, penWinner: "" });
                 }
+                // Auto-clear pens if ET is no longer a draw
+                if (pred.goesToET && etFilled && !etDraw && pred.goesToPens) {
+                  update(match.id, { goesToPens: false, penWinner: "" });
+                }
+
                 return (
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
-                  {!ftDraw && pred.homeScore !== "" && pred.awayScore !== "" && (
-                    <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✓ {Number(pred.homeScore) > Number(pred.awayScore) ? homeTeam : awayTeam} win — no ET needed</p>
+                  {ftWin && (
+                    <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✓ {ftH > ftA ? homeTeam : awayTeam} win — no ET needed</p>
                   )}
+
+                  {/* FT Draw — ET required */}
                   {ftDraw && (
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToET ? "8px" : 0 }}>
-                    <input type="checkbox" checked={pred.goesToET} disabled={isDisabled}
-                      onChange={e => update(match.id, { goesToET: e.target.checked, goesToPens: e.target.checked ? pred.goesToPens : false })}
-                      style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
-                    Goes to extra time?
-                    <span style={{ color: "var(--green)", fontWeight: 700, fontSize: "11px" }}>+8pts if correct</span>
-                  </label>
+                    <>
+                      {!pred.goesToET && !isDisabled && (
+                        <div style={{ padding: "6px 10px", borderRadius: "6px", background: "#fee2e2", border: "1px solid #fca5a5", marginBottom: "8px" }}>
+                          <p style={{ fontSize: "11px", fontWeight: 700, color: "#991b1b" }}>⚠️ Score is a draw — you must select Extra Time</p>
+                        </div>
+                      )}
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToET ? "8px" : 0 }}>
+                        <input type="checkbox" checked={pred.goesToET} disabled={isDisabled}
+                          onChange={e => update(match.id, { goesToET: e.target.checked, goesToPens: e.target.checked ? pred.goesToPens : false })}
+                          style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
+                        Goes to extra time?
+                        <span style={{ color: "var(--green)", fontWeight: 700, fontSize: "11px" }}>+8pts if correct</span>
+                      </label>
+                    </>
                   )}
 
                   {pred.goesToET && (
                     <div style={{ paddingLeft: "22px", display: "grid", gap: "8px" }}>
                       <div>
-                        <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>ET score (after 120 mins)</p>
+                        <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>
+                          ET score (after 120 mins) — must be ≥ FT score
+                        </p>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <span style={{ fontSize: "11px", color: "var(--text-2)", minWidth: "60px", textAlign: "right" }}>{homeTeam}</span>
-                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etHomeScore} onChange={e => scoreInput(match.id, "etHomeScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "13px" }} />
+                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etHomeScore}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                              if (v !== "" && parseInt(v) < ftH) return; // block lower than FT
+                              scoreInput(match.id, "etHomeScore", v);
+                            }}
+                            disabled={isDisabled}
+                            style={{ fontSize: "13px", borderColor: etHomeTooLow ? "#ef4444" : undefined }} />
                           <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
-                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etAwayScore} onChange={e => scoreInput(match.id, "etAwayScore", e.target.value)} disabled={isDisabled} style={{ fontSize: "13px" }} />
+                          <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={pred.etAwayScore}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                              if (v !== "" && parseInt(v) < ftA) return; // block lower than FT
+                              scoreInput(match.id, "etAwayScore", v);
+                            }}
+                            disabled={isDisabled}
+                            style={{ fontSize: "13px", borderColor: etAwayTooLow ? "#ef4444" : undefined }} />
                           <span style={{ fontSize: "11px", color: "var(--text-2)" }}>{awayTeam}</span>
                         </div>
+                        {etInvalid && <p style={{ fontSize: "10px", color: "#ef4444", marginTop: "4px" }}>ET score can't be lower than FT score</p>}
                       </div>
 
-                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToPens ? "6px" : 0 }}>
-                        <input type="checkbox" checked={pred.goesToPens} disabled={isDisabled}
-                          onChange={e => update(match.id, { goesToPens: e.target.checked, penWinner: "" })}
-                          style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
-                        Goes to penalties?
-                        <span style={{ color: "var(--green)", fontWeight: 700, fontSize: "11px" }}>+10pts if correct</span>
-                      </label>
+                      {/* ET Draw — Pens required */}
+                      {etFilled && etDraw && (
+                        <>
+                          {!pred.goesToPens && !isDisabled && (
+                            <div style={{ padding: "6px 10px", borderRadius: "6px", background: "#fee2e2", border: "1px solid #fca5a5" }}>
+                              <p style={{ fontSize: "11px", fontWeight: 700, color: "#991b1b" }}>⚠️ ET is a draw — you must select Penalties</p>
+                            </div>
+                          )}
+                          <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: isDisabled ? "default" : "pointer", fontSize: "12px", fontWeight: 500, marginBottom: pred.goesToPens ? "6px" : 0 }}>
+                            <input type="checkbox" checked={pred.goesToPens} disabled={isDisabled}
+                              onChange={e => update(match.id, { goesToPens: e.target.checked, penWinner: "" })}
+                              style={{ width: 14, height: 14, accentColor: "var(--green)" }} />
+                            Goes to penalties?
+                            <span style={{ color: "var(--green)", fontWeight: 700, fontSize: "11px" }}>+10pts if correct</span>
+                          </label>
+                        </>
+                      )}
+
+                      {etFilled && !etDraw && !etInvalid && (
+                        <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✓ {etH > etA ? homeTeam : awayTeam} win in ET — no penalties needed</p>
+                      )}
 
                       {pred.goesToPens && (
                         <div style={{ paddingLeft: "22px" }}>
+                          {!pred.penWinner && !isDisabled && (
+                            <p style={{ fontSize: "11px", color: "#991b1b", fontWeight: 700, marginBottom: "4px" }}>⚠️ Must pick a penalty winner</p>
+                          )}
                           <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "5px" }}>Who wins on penalties?</p>
-                          <select value={pred.penWinner} onChange={e => update(match.id, { penWinner: e.target.value })} disabled={isDisabled} style={{ fontSize: "12px", padding: "6px 8px" }}>
+                          <select value={pred.penWinner} onChange={e => update(match.id, { penWinner: e.target.value })} disabled={isDisabled} style={{ fontSize: "12px", padding: "6px 8px", borderColor: !pred.penWinner ? "#f59e0b" : undefined }}>
                             <option value="">-- Pick winner --</option>
                             {[homeTeam, awayTeam].map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
