@@ -277,26 +277,33 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
         else if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
       }
 
-    // ET prediction — only meaningful if the user predicted a draw at FT (i.e. they explicitly engaged with ET)
-    if (actual.wentToET !== undefined) {
-      const userPredictedDraw = ph === pa; // FT prediction was a draw
-      if (userPredictedDraw && pred.goesToET === actual.wentToET) add("Predicts extra time", POINTS.PREDICTS_ET);
-      if (userPredictedDraw && actual.wentToET && pred.goesToET) {
+    // ET/pens — only score these if admin has entered a real result (valid scores exist)
+    // wentToET defaults to false in DB even before result is entered, so we must check homeScore is valid first
+    const actualResultEntered = !isNaN(ah) && !isNaN(aa);
+    if (actualResultEntered && actual.wentToET !== undefined) {
+      const userPredictedDraw = ph === pa;
+      // Only award if match actually went to ET (not just "both are false by default")
+      if (actual.wentToET && userPredictedDraw && pred.goesToET) {
+        add("Predicts extra time", POINTS.PREDICTS_ET);
         const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
         const aeh = parseInt(actual.etHomeScore), aea = parseInt(actual.etAwayScore);
         if (!isNaN(eh) && !isNaN(ea) && !isNaN(aeh) && !isNaN(aea) && eh === aeh && ea === aea) {
           add("Correct ET score", POINTS.CORRECT_ET_SCORE);
         }
       }
+      // Award for correctly predicting NO extra time (user predicted a draw but admin says no ET — rare but possible via walkover etc.)
+      // Skip this — too ambiguous. Only award positive ET prediction.
     }
 
-    // Penalties prediction — only meaningful if user predicted ET ended in a draw (i.e. they explicitly engaged with pens)
-    if (actual.wentToPens !== undefined) {
+    // Penalties — only if match actually went to pens
+    if (actualResultEntered && actual.wentToPens) {
       const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
       const userPredictedETDraw = pred.goesToET && !isNaN(eh) && !isNaN(ea) && eh === ea;
-      if (userPredictedETDraw && pred.goesToPens === actual.wentToPens) add("Predicts penalties", POINTS.PREDICTS_PENS);
-      if (userPredictedETDraw && actual.wentToPens && pred.goesToPens && pred.penWinner && actual.penWinner) {
-        if (pred.penWinner === actual.penWinner) add("Correct penalty winner", POINTS.CORRECT_PEN_WINNER);
+      if (userPredictedETDraw && pred.goesToPens) {
+        add("Predicts penalties", POINTS.PREDICTS_PENS);
+        if (pred.penWinner && actual.penWinner && pred.penWinner === actual.penWinner) {
+          add("Correct penalty winner", POINTS.CORRECT_PEN_WINNER);
+        }
       }
     }
 
