@@ -1148,34 +1148,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 )}
               </div>
 
-              {/* Knockout predictions */}
-              <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>
-                  🏆 Knockout Predictions ({Object.keys(viewingUser.knockoutPredictions).length} matches)
-                </p>
-                {Object.keys(viewingUser.knockoutPredictions).length > 0 ? (
-                  <div style={{ display: "grid", gap: "6px" }}>
-                    {Object.entries(viewingUser.knockoutPredictions).map(([matchId, pred]) => {
-                      const home = pred.homeTeam || matchId;
-                      const away = pred.awayTeam || "";
-                      return (
-                        <div key={matchId} style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
-                          <span style={{ fontSize: "10px", color: "var(--text-3)", minWidth: "55px" }}>{matchId.replace(/-/g, " ").toUpperCase()}</span>
-                          <span style={{ flex: 1, textAlign: "right" }}>{home}</span>
-                          <span style={{ fontWeight: 800, color: "var(--green)", minWidth: "50px", textAlign: "center" }}>
-                            {pred.homeScore} – {pred.awayScore}
-                            {pred.goesToET ? " (ET)" : ""}
-                            {pred.goesToPens ? " (P)" : ""}
-                          </span>
-                          <span style={{ flex: 1 }}>{away}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: "12px", color: "var(--text-3)" }}>No knockout predictions yet</p>
-                )}
-              </div>
 
               {/* Knockout Predictions - editable */}
               {(() => {
@@ -1205,7 +1177,13 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                           const home = ph ? ph.split(" vs ")[0] : (m as {homeTeam?:string}).homeTeam || "";
                           const away = ph ? ph.split(" vs ")[1] : (m as {awayTeam?:string}).awayTeam || "";
                           if (home && away && !newPreds[m.id]) {
-                            newPreds[m.id] = { homeTeam: home, awayTeam: away, homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                            const _koS = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
+                            const _s = _koS[Math.floor(Math.random()*_koS.length)];
+                            const _isDraw = _s[0]===_s[1], _b=parseInt(_s[0]);
+                            const _etOpts: [number,number][] = [[_b,_b],[_b+1,_b],[_b,_b+1],[_b+1,_b+1]];
+                            const [_eh,_ea] = _isDraw ? _etOpts[Math.floor(Math.random()*_etOpts.length)] : [0,0];
+                            const _etDraw = _isDraw && _eh===_ea;
+                            newPreds[m.id] = {homeTeam:home,awayTeam:away,homeScore:_s[0],awayScore:_s[1],goesToET:_isDraw,etHomeScore:_isDraw?String(_eh):"",etAwayScore:_isDraw?String(_ea):"",goesToPens:_etDraw,penWinner:_etDraw?(Math.random()<0.5?home:away):""};
                           }
                         });
                         const updated = { ...viewingUser, knockoutPredictions: newPreds };
@@ -1257,16 +1235,23 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                                   style={{ width:36, textAlign:"center", fontWeight:800, fontSize:"14px", padding:"3px 2px", border:`2px solid ${pred ? "var(--green)" : "var(--border)"}`, borderRadius:"4px" }} />
                                 <div style={{ flex:1, fontSize:"11px", color:"var(--text-2)" }}>{awayTeam}</div>
                                 {needsAutoFill && <span style={{ fontSize:"9px", color:"#92400e", background:"#fde047", padding:"1px 5px", borderRadius:"3px", flexShrink:0 }}>⚠️ &lt;4h</span>}
-                                {pred && (
+                                {(pred || viewingUser.knockoutPredictions[m.id]?.homeScore !== undefined) && (
                                   <button onClick={async () => {
-                                    const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: { ...pred, homeScore: viewingUser.knockoutPredictions[m.id]?.homeScore ?? pred.homeScore, awayScore: viewingUser.knockoutPredictions[m.id]?.awayScore ?? pred.awayScore } } };
+                                    const cur = viewingUser.knockoutPredictions[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
+                                    const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: cur } };
                                     await savePlayer(updated);
                                     setUsers(prev => prev.map(u => u.id===updated.id ? updated : u));
                                   }} style={{ fontSize:"11px", padding:"3px 8px", borderRadius:"5px", border:"none", background:"var(--green)", color:"white", cursor:"pointer", flexShrink:0, fontWeight:700 }}>✓</button>
                                 )}
-                                {!pred && !locked && (
+                                {!pred && !locked && !(viewingUser.knockoutPredictions[m.id]?.homeScore) && (
                                   <button onClick={async () => {
-                                    const newPred = {homeTeam,awayTeam,homeScore:"1",awayScore:"1",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
+                                    const _koScores = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
+                                    const _s = _koScores[Math.floor(Math.random()*_koScores.length)];
+                                    const _isDraw = _s[0]===_s[1], _b=parseInt(_s[0]);
+                                    const _etOpts: [number,number][] = [[_b,_b],[_b+1,_b],[_b,_b+1],[_b+1,_b+1]];
+                                    const [_eh,_ea] = _isDraw ? _etOpts[Math.floor(Math.random()*_etOpts.length)] : [0,0];
+                                    const _etDraw = _isDraw && _eh===_ea;
+                                    const newPred = {homeTeam,awayTeam,homeScore:_s[0],awayScore:_s[1],goesToET:_isDraw,etHomeScore:_isDraw?String(_eh):"",etAwayScore:_isDraw?String(_ea):"",goesToPens:_etDraw,penWinner:_etDraw?(Math.random()<0.5?homeTeam:awayTeam):""};
                                     const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: newPred } };
                                     await savePlayer(updated);
                                     setViewingUser(updated);
@@ -1363,7 +1348,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                   {users.length} player{users.length !== 1 ? "s" : ""} registered.
                 </p>
                 <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
-                  if (!confirm("Auto-fill missing predictions for all players who haven't predicted matches kicking off within 3 hours? Uses random 1-1/2-1/1-2.")) return;
+                  if (!confirm("Auto-fill missing predictions for all players who haven't predicted matches kicking off within 3 hours? Uses random 0-0/0-1/1-0/1-1/1-2/2-1.")) return;
                   const now = new Date();
                   const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
                   let filled = 0;
@@ -1379,7 +1364,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                     });
                     if (!missing.length) continue;
                     const newPreds = { ...u.groupPredictions };
-                    const scores = [["1","1"],["2","1"],["1","2"]]; missing.forEach(m => { const s = scores[Math.floor(Math.random()*3)]; newPreds[m.id] = { home: s[0], away: s[1] }; });
+                    const scores = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]]; missing.forEach(m => { const s = scores[Math.floor(Math.random()*scores.length)]; newPreds[m.id] = { home: s[0], away: s[1] }; });
                     const updated = { ...u, groupPredictions: newPreds };
                     await savePlayer(updated);
                     setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
@@ -1489,9 +1474,9 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                           <button className="btn-secondary" onClick={() => setEditingUser(u)} style={{ fontSize: "12px", padding: "5px 10px" }}>Edit</button>
                           <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 10px" }} title="Auto-fill missing predictions with random 1-1/2-1/1-2" onClick={async () => {
                             if (!confirm(`Auto-fill ALL missing predictions for ${u.name} with random scores (1-1, 2-1, or 1-2)?`)) return;
-                            const scores = [["1","1"],["2","1"],["1","2"]];
+                            const scores = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
                             const newPreds = { ...u.groupPredictions };
-                            GROUP_MATCHES.forEach(m => { if (!newPreds[m.id]) { const s = scores[Math.floor(Math.random()*3)]; newPreds[m.id] = { home: s[0], away: s[1] }; } });
+                            GROUP_MATCHES.forEach(m => { if (!newPreds[m.id]) { const s = scores[Math.floor(Math.random()*scores.length)]; newPreds[m.id] = { home: s[0], away: s[1] }; } });
                             const updated = { ...u, groupPredictions: newPreds };
                             await savePlayer(updated);
                             setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
@@ -1773,9 +1758,24 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
           return new Date(Date.UTC(2026,months[mon],+day,+hh-(t.includes("BST")?1:0),+mm));
         };
         const upcoming = GROUP_MATCHES.filter(m => { const ko=parseKO(m.dateUK,m.timeUK); return ko>=now&&ko<=in96h; });
-        // Also include R32 knockout matches in next 96h
         const r32Upcoming = (KNOCKOUT_MATCHES.r32||[]).filter(m => { const ko=parseKO(m.dateUK,m.timeUK); return ko>=now&&ko<=in96h; });
-        const scores = [["1","1"],["2","1"],["1","2"]];
+        const scores = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
+        const KO_SCORES = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
+        const randScore = () => KO_SCORES[Math.floor(Math.random()*KO_SCORES.length)];
+        const makeKOPred = (homeTeam: string, awayTeam: string) => {
+          const s = randScore();
+          const isDraw = s[0] === s[1];
+          if (!isDraw) return { homeTeam, awayTeam, homeScore:s[0], awayScore:s[1], goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+          // Draw — pick ET score (>= FT score, could be same or one more each)
+          const base = parseInt(s[0]);
+          const etOptions: [number,number][] = [[base,base],[base+1,base],[base,base+1],[base+1,base+1]];
+          const [etH,etA] = etOptions[Math.floor(Math.random()*etOptions.length)];
+          const etDraw = etH === etA;
+          if (!etDraw) return { homeTeam, awayTeam, homeScore:s[0], awayScore:s[1], goesToET:true, etHomeScore:String(etH), etAwayScore:String(etA), goesToPens:false, penWinner:"" };
+          // ET draw — goes to pens, pick winner
+          const penWinner = Math.random() < 0.5 ? homeTeam : awayTeam;
+          return { homeTeam, awayTeam, homeScore:s[0], awayScore:s[1], goesToET:true, etHomeScore:String(etH), etAwayScore:String(etA), goesToPens:true, penWinner };
+        };
         return (
           <div>
             <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
@@ -1803,7 +1803,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                           <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px" }} onClick={async () => {
                             if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} player(s)?`)) return;
                             for (const u of missing) {
-                              const s = scores[Math.floor(Math.random()*3)];
+                              const s = scores[Math.floor(Math.random()*scores.length)];
                               const updated = { ...u, groupPredictions: { ...u.groupPredictions, [m.id]: { home: s[0], away: s[1] } } };
                               await savePlayer(updated);
                               setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
@@ -1820,7 +1820,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                             <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", fontSize: "11px" }}>
                               <span>{u.name}</span>
                               <button onClick={async () => {
-                                const s = scores[Math.floor(Math.random()*3)];
+                                const s = scores[Math.floor(Math.random()*scores.length)];
                                 const updated = { ...u, groupPredictions: { ...u.groupPredictions, [m.id]: { home: s[0], away: s[1] } } };
                                 await savePlayer(updated);
                                 setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
@@ -1875,7 +1875,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                             onClick={async () => {
                               if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} missing player(s) with 1-1?`)) return;
                               for (const u of missing) {
-                                const defaultPred = { homeTeam: home||"", awayTeam: away||"", homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                                const defaultPred = makeKOPred(home||"", away||"");
                                 const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
                                 await savePlayer(updated);
                                 setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
@@ -1891,7 +1891,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                               <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "2px", background: "#fee2e2", borderRadius: "99px", padding: "2px 6px 2px 8px" }}>
                                 <span style={{ fontSize: "11px", color: "#991b1b", fontWeight: 600 }}>{u.name}</span>
                                 <button onClick={async () => {
-                                  const defaultPred = { homeTeam: home||"", awayTeam: away||"", homeScore:"1", awayScore:"1", goesToET:false, etHomeScore:"", etAwayScore:"", goesToPens:false, penWinner:"" };
+                                  const defaultPred = makeKOPred(home||"", away||"");
                                   const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
                                   await savePlayer(updated);
                                   setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
