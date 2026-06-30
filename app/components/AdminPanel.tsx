@@ -526,11 +526,11 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
               <div style={{ display: "grid", gap: "8px" }}>
                 {KNOCKOUT_MATCHES[activeKnockoutRound].map((match) => {
                   const stored = localState.results.knockout[match.id];
-                  // For R32, pre-fill team names from the confirmed placeholder if not already set
-                  let res = stored || { ...EMPTY_KO_RESULT };
-                  if (!stored && activeKnockoutRound === "r32" && match.placeholder?.includes(" vs ")) {
+                  // Pre-fill team names from confirmed placeholder whenever they're empty — even if a result record already exists
+                  let res = stored ? { ...stored } : { ...EMPTY_KO_RESULT };
+                  if ((!res.homeTeam || !res.awayTeam) && match.placeholder?.includes(" vs ")) {
                     const [ph, pa] = match.placeholder.split(" vs ");
-                    res = { ...res, homeTeam: ph, awayTeam: pa };
+                    res = { ...res, homeTeam: res.homeTeam || ph, awayTeam: res.awayTeam || pa };
                   }
                   return (
                     <div key={match.id} className="card" style={{ padding: "14px" }}>
