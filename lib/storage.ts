@@ -277,10 +277,11 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
         else if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
       }
 
-    // ET prediction
+    // ET prediction — only meaningful if the user predicted a draw at FT (i.e. they explicitly engaged with ET)
     if (actual.wentToET !== undefined) {
-      if (pred.goesToET === actual.wentToET) add("Predicts extra time", POINTS.PREDICTS_ET);
-      if (actual.wentToET && pred.goesToET) {
+      const userPredictedDraw = ph === pa; // FT prediction was a draw
+      if (userPredictedDraw && pred.goesToET === actual.wentToET) add("Predicts extra time", POINTS.PREDICTS_ET);
+      if (userPredictedDraw && actual.wentToET && pred.goesToET) {
         const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
         const aeh = parseInt(actual.etHomeScore), aea = parseInt(actual.etAwayScore);
         if (!isNaN(eh) && !isNaN(ea) && !isNaN(aeh) && !isNaN(aea) && eh === aeh && ea === aea) {
@@ -289,10 +290,12 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
       }
     }
 
-    // Penalties prediction
+    // Penalties prediction — only meaningful if user predicted ET ended in a draw (i.e. they explicitly engaged with pens)
     if (actual.wentToPens !== undefined) {
-      if (pred.goesToPens === actual.wentToPens) add("Predicts penalties", POINTS.PREDICTS_PENS);
-      if (actual.wentToPens && pred.goesToPens && pred.penWinner && actual.penWinner) {
+      const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
+      const userPredictedETDraw = pred.goesToET && !isNaN(eh) && !isNaN(ea) && eh === ea;
+      if (userPredictedETDraw && pred.goesToPens === actual.wentToPens) add("Predicts penalties", POINTS.PREDICTS_PENS);
+      if (userPredictedETDraw && actual.wentToPens && pred.goesToPens && pred.penWinner && actual.penWinner) {
         if (pred.penWinner === actual.penWinner) add("Correct penalty winner", POINTS.CORRECT_PEN_WINNER);
       }
     }

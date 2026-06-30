@@ -1391,10 +1391,17 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
 
               {/* Missing predictions alert */}
               {(() => {
-                const incomplete = users.filter(u =>
-                  Object.keys(u.groupPredictions).length < GROUP_MATCHES.length ||
-                  !u.topScorer || !u.tournamentWinner || !u.playerOfTournament
-                );
+                // Count how many R32 matches have confirmed teams (predictable)
+                const r32Predictable = (KNOCKOUT_MATCHES.r32 || []).filter(m => m.placeholder?.includes(" vs ")).length;
+                const incomplete = users.filter(u => {
+                  const gDone = Object.keys(u.groupPredictions).length;
+                  const koDone = Object.keys(u.knockoutPredictions || {}).filter(id => {
+                    const p = u.knockoutPredictions[id];
+                    return p?.homeScore !== undefined && p?.homeScore !== "";
+                  }).length;
+                  return gDone < GROUP_MATCHES.length || koDone < r32Predictable ||
+                    !u.topScorer || !u.tournamentWinner || !u.playerOfTournament;
+                });
                 if (!incomplete.length) return (
                   <div className="card" style={{ padding: "10px 14px", marginBottom: "12px", borderLeft: "3px solid var(--green)", fontSize: "13px" }}>
                     ✅ All players have completed their predictions!
@@ -1407,7 +1414,12 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                       {incomplete.map(u => {
                         const missing: string[] = [];
                         const gDone = Object.keys(u.groupPredictions).length;
+                        const koDone = Object.keys(u.knockoutPredictions || {}).filter(id => {
+                          const p = u.knockoutPredictions[id];
+                          return p?.homeScore !== undefined && p?.homeScore !== "";
+                        }).length;
                         if (gDone < GROUP_MATCHES.length) missing.push(`${GROUP_MATCHES.length - gDone} group matches`);
+                        if (koDone < r32Predictable) missing.push(`${r32Predictable - koDone} R32 matches`);
                         if (!u.topScorer) missing.push("Golden Boot");
                         if (!u.topAssist) missing.push("Top Assist");
                         if (!u.tournamentWinner) missing.push("Tournament Winner");

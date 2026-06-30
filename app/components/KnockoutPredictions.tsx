@@ -322,12 +322,33 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
                             const correct = result?.homeScore && pr.homeScore === result.homeScore && pr.awayScore === result.awayScore;
                             const correctResult = result?.homeScore && !correct && getOutcome(pr.homeScore, pr.awayScore) === getOutcome(result.homeScore!, result.awayScore!);
                             const indicator = correct ? "✅" : result?.homeScore ? (correctResult ? "🟡" : "❌") : null;
+                            const isDraw = pr.homeScore === pr.awayScore;
+                            // Determine who they predicted to win via ET/pens
+                            let predictedWinner: string | null = null;
+                            let winnerVia: "ET" | "Pens" | null = null;
+                            if (isDraw && pr.goesToET) {
+                              const eh = parseInt(pr.etHomeScore), ea = parseInt(pr.etAwayScore);
+                              if (!isNaN(eh) && !isNaN(ea) && eh !== ea) {
+                                predictedWinner = eh > ea ? pr.homeTeam : pr.awayTeam;
+                                winnerVia = "ET";
+                              } else if (!isNaN(eh) && !isNaN(ea) && eh === ea && pr.goesToPens && pr.penWinner) {
+                                predictedWinner = pr.penWinner;
+                                winnerVia = "Pens";
+                              }
+                            }
                             return (
-                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 8px", borderRadius: "8px", background: correct ? "#dcfce7" : isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${correct ? "#22c55e" : isMe ? "var(--green)" : "var(--border)"}` }}>
-                                <AvatarDisplay url={p.avatarUrl} name={p.name} size={18} />
-                                <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name.split(" ")[0]}</span>
-                                <span style={{ fontSize: "11px", fontWeight: 800, flexShrink: 0 }}>{pr.homeScore}–{pr.awayScore}</span>
-                                {indicator && <span style={{ fontSize: "11px", flexShrink: 0 }}>{indicator}</span>}
+                              <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "4px 8px", borderRadius: "8px", background: correct ? "#dcfce7" : isMe ? "var(--green-light)" : "var(--surface2)", border: `1px solid ${correct ? "#22c55e" : isMe ? "var(--green)" : "var(--border)"}` }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                  <AvatarDisplay url={p.avatarUrl} name={p.name} size={18} />
+                                  <span style={{ fontSize: "11px", fontWeight: 600, color: isMe ? "var(--green)" : "var(--text-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name.split(" ")[0]}</span>
+                                  <span style={{ fontSize: "11px", fontWeight: 800, flexShrink: 0 }}>{pr.homeScore}–{pr.awayScore}</span>
+                                  {indicator && <span style={{ fontSize: "11px", flexShrink: 0 }}>{indicator}</span>}
+                                </div>
+                                {predictedWinner && (
+                                  <div style={{ fontSize: "10px", color: "var(--text-3)", paddingLeft: "23px" }}>
+                                    🏆 {predictedWinner} <span style={{ opacity: 0.7 }}>(via {winnerVia})</span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
