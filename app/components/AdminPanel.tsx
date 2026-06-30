@@ -197,7 +197,15 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const updateKnockoutResult = (matchId: string, field: string, value: string | boolean) => {
     const isScore = ["homeScore", "awayScore", "etHomeScore", "etAwayScore"].includes(field);
     const v = isScore && typeof value === "string" ? value.replace(/\D/g, "").slice(0, 2) : value;
-    const current = localState.results.knockout[matchId] || { ...EMPTY_KO_RESULT };
+    let current = localState.results.knockout[matchId] || { ...EMPTY_KO_RESULT };
+    // If this is the first edit and team names aren't set yet, pre-fill from R32 placeholder
+    if (!current.homeTeam && !current.awayTeam) {
+      const match = (KNOCKOUT_MATCHES.r32 || []).find(m => m.id === matchId);
+      if (match?.placeholder?.includes(" vs ")) {
+        const [ph, pa] = match.placeholder.split(" vs ");
+        current = { ...current, homeTeam: ph, awayTeam: pa };
+      }
+    }
     const updated = { ...current, [field]: v };
 
     const newKnockout = { ...localState.results.knockout, [matchId]: updated };
@@ -517,7 +525,13 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
               </div>
               <div style={{ display: "grid", gap: "8px" }}>
                 {KNOCKOUT_MATCHES[activeKnockoutRound].map((match) => {
-                  const res = localState.results.knockout[match.id] || { ...EMPTY_KO_RESULT };
+                  const stored = localState.results.knockout[match.id];
+                  // For R32, pre-fill team names from the confirmed placeholder if not already set
+                  let res = stored || { ...EMPTY_KO_RESULT };
+                  if (!stored && activeKnockoutRound === "r32" && match.placeholder?.includes(" vs ")) {
+                    const [ph, pa] = match.placeholder.split(" vs ");
+                    res = { ...res, homeTeam: ph, awayTeam: pa };
+                  }
                   return (
                     <div key={match.id} className="card" style={{ padding: "14px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
