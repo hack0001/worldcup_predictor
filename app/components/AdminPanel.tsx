@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
-import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage, getAllLeagues } from "@/lib/storage";
+import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage, getAllLeagues, calculatePlayerPoints } from "@/lib/storage";
 import { saveTeamForm, getAllTeamForms, FormMatch, TeamForm, bustFormCache } from "@/lib/footballApi";
 import Flag from "./Flag";
 import FlagSelect from "./FlagSelect";
@@ -65,7 +65,7 @@ function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
 
 export default function AdminPanel({ adminState, onUpdate, onClose, currentPlayerId = "admin" }: Props) {
   const [authenticated] = useState(true); // Auth handled by page-level login
-  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill">("results");
+  const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill" | "audit">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
   const [userFantasySquads, setUserFantasySquads] = useState<Record<string, string[]>>({});
   const [fetchedStats, setFetchedStats] = useState<null | {
@@ -296,6 +296,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
         <button className={activeSection === "users" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("users")}>👥 Users ({users.length})</button>
         <button className={activeSection === "leagues" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("leagues")}>🏆 Leagues</button>
         <button className={activeSection === "autofill" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("autofill")}>⚡ Auto-fill</button>
+        <button className={activeSection === "audit" ? "btn-primary" : "btn-secondary"} onClick={() => setActiveSection("audit")}>🔍 Points Audit</button>
       </div>
 
       {activeSection === "results" && (
@@ -1959,6 +1960,136 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 })}
               </div>
             </div>
+          </div>
+        );
+      })()}
+      {activeSection === "audit" && (() => {
+        const leaderboard = users.map(u => {
+          const { total, breakdown } = calculatePlayerPoints(u, adminState);
+          return { player: u, total, breakdown };
+        }).sort((a, b) => b.total - a.total);
+
+        const completedKO = Object.entries(adminState.results.knockout || {})
+          .filter(([, r]) => r.homeScore !== "" && r.awayScore !== "" && !isNaN(parseInt(r.homeScore)));
+
+        return (
+          <div>
+            <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
+              Full breakdown of every player's points — verify each prediction against the actual result and confirm totals match the leaderboard.
+            </p>
+
+            {leaderboard.map(({ player, total, breakdown }) => (
+              <div key={player.id} className="card" style={{ marginBottom: "12px", padding: 0, overflow: "hidden" }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--surface2)", borderBottom: "2px solid var(--border)" }}>
+                  <div>
+                    <span style={{ fontWeight: 800, fontSize: "14px" }}>{player.name}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-3)", marginLeft: "8px" }}>{player.teamName}</span>
+                  </div>
+                  <span style={{ fontWeight: 900, fontSize: "20px", color: "var(--green)" }}>{total}pts</span>
+                </div>
+
+                {/* Breakdown pills */}
+                <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border)", display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {Object.keys(breakdown).length === 0
+                    ? <span style={{ fontSize: "11px", color: "var(--text-3)" }}>No points yet</span>
+                    : Object.entries(breakdown).map(([key, pts]) => (
+                      <span key={key} style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "99px", background: "var(--green-light)", color: "var(--green)", fontWeight: 700 }}>+{pts} {key}</span>
+                    ))
+                  }
+                </div>
+
+                {/* Knockout predictions vs results */}
+                {completedKO.length > 0 && (
+                  <div style={{ padding: "8px 14px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Knockout Predictions</p>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-3)" }}>
+                          <th style={{ padding: "3px 6px", textAlign: "left", fontWeight: 600 }}>Match</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>Predicted</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>Actual</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>homeTeam in pred</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>awayTeam in pred</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>predWinner</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>actualWinner</th>
+                          <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>✓</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {completedKO.map(([matchId, actual]) => {
+                          const pred = player.knockoutPredictions?.[matchId];
+                          if (!pred) return (
+                            <tr key={matchId} style={{ borderBottom: "1px solid var(--border)", opacity: 0.4 }}>
+                              <td style={{ padding: "3px 6px" }}>{actual.homeTeam} vs {actual.awayTeam}</td>
+                              <td colSpan={7} style={{ padding: "3px 6px", color: "var(--text-3)", textAlign: "center" }}>No prediction</td>
+                            </tr>
+                          );
+
+                          const ph = parseInt(pred.homeScore), pa = parseInt(pred.awayScore);
+                          const ah = parseInt(actual.homeScore), aa = parseInt(actual.awayScore);
+                          const validScores = !isNaN(ph) && !isNaN(pa) && !isNaN(ah) && !isNaN(aa);
+                          const exactScore = validScores && ph === ah && pa === aa;
+                          const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
+                          const ar = ah > aa ? "H" : ah < aa ? "A" : "D";
+                          const correctResult = validScores && pr === ar;
+
+                          const predHome = pred.homeTeam || actual.homeTeam;
+                          const predAway = pred.awayTeam || actual.awayTeam;
+                          const predWinner = (() => {
+                            if (!validScores) return "?";
+                            if (ph !== pa) return ph > pa ? predHome : predAway;
+                            if (!pred.goesToET) return "(draw - no ET)";
+                            const eh = parseInt(pred.etHomeScore), ea = parseInt(pred.etAwayScore);
+                            if (isNaN(eh) || isNaN(ea)) return "(ET not filled)";
+                            if (eh !== ea) return eh > ea ? predHome : predAway;
+                            if (!pred.goesToPens || !pred.penWinner) return "(pens not filled)";
+                            return pred.penWinner;
+                          })();
+
+                          const actualWinner = actual.wentToPens && actual.penWinner
+                            ? actual.penWinner
+                            : actual.wentToET && actual.etHomeScore && actual.etAwayScore
+                              ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
+                              : ah !== aa ? (ah > aa ? actual.homeTeam : actual.awayTeam) : "Draw(no winner)";
+
+                          const qualifierMatch = predWinner === actualWinner && typeof predWinner === "string" && !predWinner.startsWith("(");
+                          const color = exactScore ? "#15803d" : correctResult ? "#ca8a04" : "var(--text-3)";
+
+                          return (
+                            <tr key={matchId} style={{ borderBottom: "1px solid var(--border)", background: exactScore ? "#f0fdf4" : correctResult ? "#fefce8" : "transparent" }}>
+                              <td style={{ padding: "3px 6px", fontWeight: 600 }}>{actual.homeTeam} vs {actual.awayTeam}</td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 700, color }}>
+                                {pred.homeScore}–{pred.awayScore}
+                                {pred.goesToET ? ` (ET ${pred.etHomeScore}–${pred.etAwayScore})` : ""}
+                                {pred.goesToPens ? ` (P: ${pred.penWinner})` : ""}
+                              </td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", fontWeight: 700 }}>
+                                {actual.homeScore}–{actual.awayScore}
+                                {actual.wentToET ? ` (ET ${actual.etHomeScore}–${actual.etAwayScore})` : ""}
+                                {actual.wentToPens ? ` (P: ${actual.penWinner})` : ""}
+                              </td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", color: pred.homeTeam ? "var(--green)" : "#ef4444", fontWeight: 600 }}>
+                                {pred.homeTeam || "❌ BLANK"}
+                              </td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", color: pred.awayTeam ? "var(--green)" : "#ef4444", fontWeight: 600 }}>
+                                {pred.awayTeam || "❌ BLANK"}
+                              </td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", fontSize: "10px" }}>{predWinner}</td>
+                              <td style={{ padding: "3px 6px", textAlign: "center", fontSize: "10px" }}>{actualWinner}</td>
+                              <td style={{ padding: "3px 6px", textAlign: "center" }}>
+                                {exactScore ? "🏆" : correctResult ? "✓" : "✗"}
+                                {qualifierMatch ? " Q" : ""}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         );
       })()}
