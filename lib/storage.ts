@@ -341,7 +341,7 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
       return pred.penWinner;
     })();
 
-    if (winner && predWinner && winner === predWinner) {
+    if (winner && predWinner && winner === predWinner && correctResult) {
       if (isEarly) add("Correct qualifier (R32/R16)", POINTS.EARLY_KO_CORRECT_QUALIFIER);
       if (stage === "qf") add("Correct quarter-finalist", POINTS.CORRECT_QUARTER_FINALIST);
       if (stage === "sf") add("Correct semi-finalist", POINTS.CORRECT_SEMI_FINALIST);
