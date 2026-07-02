@@ -198,12 +198,16 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
     const isScore = ["homeScore", "awayScore", "etHomeScore", "etAwayScore"].includes(field);
     const v = isScore && typeof value === "string" ? value.replace(/\D/g, "").slice(0, 2) : value;
     let current = localState.results.knockout[matchId] || { ...EMPTY_KO_RESULT };
-    // If this is the first edit and team names aren't set yet, pre-fill from R32 placeholder
-    if (!current.homeTeam && !current.awayTeam) {
-      const match = (KNOCKOUT_MATCHES.r32 || []).find(m => m.id === matchId);
-      if (match?.placeholder?.includes(" vs ")) {
-        const [ph, pa] = match.placeholder.split(" vs ");
-        current = { ...current, homeTeam: ph, awayTeam: pa };
+    // Pre-fill team names from placeholder for any round if blank
+    if (!current.homeTeam || !current.awayTeam) {
+      // Check all knockout rounds for a placeholder with real team names
+      for (const matches of Object.values(KNOCKOUT_MATCHES)) {
+        const m = (matches as {id:string;placeholder?:string}[]).find(m => m.id === matchId);
+        if (m?.placeholder && !m.placeholder.startsWith("W") && m.placeholder.includes(" vs ")) {
+          const [ph, pa] = m.placeholder.split(" vs ");
+          current = { ...current, homeTeam: current.homeTeam || ph, awayTeam: current.awayTeam || pa };
+          break;
+        }
       }
     }
     const updated = { ...current, [field]: v };
@@ -570,9 +574,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
               <div style={{ display: "grid", gap: "8px" }}>
                 {KNOCKOUT_MATCHES[activeKnockoutRound].map((match) => {
                   const stored = localState.results.knockout[match.id];
-                  // Pre-fill team names from confirmed placeholder whenever they're empty — even if a result record already exists
                   let res = stored ? { ...stored } : { ...EMPTY_KO_RESULT };
-                  if ((!res.homeTeam || !res.awayTeam) && match.placeholder?.includes(" vs ")) {
+                  // Pre-fill team names from confirmed placeholder whenever empty
+                  // For R32: use placeholder directly. For later rounds: placeholder has "W79 vs W80" so skip it
+                  if ((!res.homeTeam || !res.awayTeam) && match.placeholder?.includes(" vs ") && !match.placeholder.startsWith("W")) {
                     const [ph, pa] = match.placeholder.split(" vs ");
                     res = { ...res, homeTeam: res.homeTeam || ph, awayTeam: res.awayTeam || pa };
                   }
@@ -638,7 +643,38 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
           )}
 
           <div style={{ marginTop: "20px", textAlign: "right" }}>
-            <button className="btn-primary" onClick={saveResults} disabled={saving}>{saving ? "Saving..." : "💾 Save All Results"}</button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => {
+                // Rebuild all R16+ team names from current R32 results
+                const newKnockout = { ...localState.results.knockout };
+                for (const [nextMatchId, feedMatches] of Object.entries(BRACKET_PROGRESSION)) {
+                  const feedList = feedMatches.split(",");
+                  for (const feedMatchId of feedList) {
+                    const r = newKnockout[feedMatchId];
+                    if (!r) continue;
+                    let winner = "";
+                    if (r.wentToPens && r.penWinner) winner = r.penWinner;
+                    else if (r.wentToET && r.etHomeScore && r.etAwayScore) {
+                      const h = parseInt(r.etHomeScore), a = parseInt(r.etAwayScore);
+                      if (!isNaN(h) && !isNaN(a) && h !== a) winner = h > a ? r.homeTeam : r.awayTeam;
+                    } else {
+                      const h = parseInt(r.homeScore), a = parseInt(r.awayScore);
+                      if (!isNaN(h) && !isNaN(a) && r.homeTeam && r.awayTeam && h !== a) winner = h > a ? r.homeTeam : r.awayTeam;
+                    }
+                    if (winner) {
+                      const nextMatch = newKnockout[nextMatchId] || { ...EMPTY_KO_RESULT };
+                      const isFirst = feedList[0] === feedMatchId;
+                      newKnockout[nextMatchId] = { ...nextMatch, homeTeam: isFirst ? winner : nextMatch.homeTeam, awayTeam: !isFirst ? winner : nextMatch.awayTeam };
+                    }
+                  }
+                }
+                const newState = { ...localState, results: { ...localState.results, knockout: newKnockout } };
+                setLocalState(newState);
+                saveAdminState(newState).then(() => onUpdate(newState));
+                alert("Bracket recalculated and saved.");
+              }}>🔄 Recalculate Bracket</button>
+              <button className="btn-primary" onClick={saveResults} disabled={saving}>{saving ? "Saving..." : "💾 Save All Results"}</button>
+            </div>
           </div>
         </div>
       )}
