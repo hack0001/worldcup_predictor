@@ -1260,7 +1260,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                                 <div style={{ flex: 1, fontSize: "11px", textAlign: "right", color: "var(--text-2)" }}>{homeTeam}</div>
                                 <input type="text" inputMode="numeric" maxLength={2}
                                   value={pred?.homeScore ?? ""}
-                                  disabled={locked}
                                   onChange={e => {
                                     const val = e.target.value.replace(/[^0-9]/g,"");
                                     const cur = koPreds[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
@@ -1270,7 +1269,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                                 <span style={{ fontSize:"11px", color:"var(--text-3)" }}>–</span>
                                 <input type="text" inputMode="numeric" maxLength={2}
                                   value={pred?.awayScore ?? ""}
-                                  disabled={locked}
                                   onChange={e => {
                                     const val = e.target.value.replace(/[^0-9]/g,"");
                                     const cur = koPreds[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
@@ -1279,7 +1277,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                                   style={{ width:36, textAlign:"center", fontWeight:800, fontSize:"14px", padding:"3px 2px", border:`2px solid ${pred ? "var(--green)" : "var(--border)"}`, borderRadius:"4px" }} />
                                 <div style={{ flex:1, fontSize:"11px", color:"var(--text-2)" }}>{awayTeam}</div>
                                 {needsAutoFill && <span style={{ fontSize:"9px", color:"#92400e", background:"#fde047", padding:"1px 5px", borderRadius:"3px", flexShrink:0 }}>⚠️ &lt;4h</span>}
-                                {(pred || viewingUser.knockoutPredictions[m.id]?.homeScore !== undefined) && (
+                                {(pred || viewingUser.knockoutPredictions[m.id]?.homeScore !== undefined || viewingUser.knockoutPredictions[m.id]?.homeScore !== "") && viewingUser.knockoutPredictions[m.id] && (
                                   <button onClick={async () => {
                                     const cur = viewingUser.knockoutPredictions[m.id] || {homeTeam,awayTeam,homeScore:"",awayScore:"",goesToET:false,etHomeScore:"",etAwayScore:"",goesToPens:false,penWinner:""};
                                     const updated = { ...viewingUser, knockoutPredictions: { ...viewingUser.knockoutPredictions, [m.id]: cur } };
@@ -1287,7 +1285,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                                     setUsers(prev => prev.map(u => u.id===updated.id ? updated : u));
                                   }} style={{ fontSize:"11px", padding:"3px 8px", borderRadius:"5px", border:"none", background:"var(--green)", color:"white", cursor:"pointer", flexShrink:0, fontWeight:700 }}>✓</button>
                                 )}
-                                {!pred && !locked && !(viewingUser.knockoutPredictions[m.id]?.homeScore) && (
+                                {!pred && !(viewingUser.knockoutPredictions[m.id]?.homeScore) && (
                                   <button onClick={async () => {
                                     const _koScores = [["0","0"],["0","1"],["1","0"],["1","1"],["1","2"],["2","1"]];
                                     const _s = _koScores[Math.floor(Math.random()*_koScores.length)];
