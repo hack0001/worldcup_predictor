@@ -408,6 +408,49 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             </div>
           </div>
 
+          {/* Data Repair — fix knockout predictions missing homeTeam/awayTeam */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid #ef4444" }}>
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>🔧 Repair Knockout Predictions</p>
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>Fixes missing homeTeam/awayTeam in saved knockout predictions — required for correct qualifier scoring. Safe to run multiple times.</p>
+            <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
+              // Build team name lookup from R32 placeholders + later round admin results
+              const teamLookup: Record<string, { home: string; away: string }> = {};
+              for (const m of (KNOCKOUT_MATCHES.r32 || [])) {
+                if (m.placeholder?.includes(" vs ")) {
+                  const [h, a] = m.placeholder.split(" vs ");
+                  teamLookup[m.id] = { home: h, away: a };
+                }
+              }
+              // Later rounds from admin results
+              for (const [id, r] of Object.entries(adminState.results.knockout || {})) {
+                if (r.homeTeam && r.awayTeam) teamLookup[id] = { home: r.homeTeam, away: r.awayTeam };
+              }
+
+              let fixed = 0, players = 0;
+              for (const u of users) {
+                const preds = u.knockoutPredictions || {};
+                let changed = false;
+                const newPreds = { ...preds };
+                for (const [matchId, pred] of Object.entries(preds)) {
+                  const teams = teamLookup[matchId];
+                  if (!teams) continue;
+                  if (!pred.homeTeam || !pred.awayTeam) {
+                    newPreds[matchId] = { ...pred, homeTeam: pred.homeTeam || teams.home, awayTeam: pred.awayTeam || teams.away };
+                    fixed++;
+                    changed = true;
+                  }
+                }
+                if (changed) {
+                  const updated = { ...u, knockoutPredictions: newPreds };
+                  await savePlayer(updated);
+                  setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
+                  players++;
+                }
+              }
+              alert(`✅ Repaired ${fixed} prediction(s) across ${players} player(s).`);
+            }}>🔧 Run Repair</button>
+          </div>
+
           {/* Broadcast Message */}
           <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
             <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>📢 Broadcast to Chat</p>
