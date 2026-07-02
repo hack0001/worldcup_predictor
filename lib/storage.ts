@@ -313,28 +313,31 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
     const actualAwayScore = parseInt(actual.awayScore);
     if (isNaN(actualHomeScore) || isNaN(actualAwayScore)) continue; // no result yet
 
-    const winner = actual.wentToPens
+    const winner = actual.wentToPens && actual.penWinner
       ? actual.penWinner
-      : actual.wentToET
+      : actual.wentToET && actual.etHomeScore && actual.etAwayScore
         ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
-        : (actualHomeScore > actualAwayScore ? actual.homeTeam : actual.awayTeam);
+        : !isNaN(actualHomeScore) && !isNaN(actualAwayScore) && actualHomeScore !== actualAwayScore
+          ? (actualHomeScore > actualAwayScore ? actual.homeTeam : actual.awayTeam)
+          : null;
 
     const predWinner = (() => {
       const ftH = parseInt(pred.homeScore), ftA = parseInt(pred.awayScore);
       if (isNaN(ftH) || isNaN(ftA)) return null;
+      // Use actual team names as fallback if pred.homeTeam/awayTeam are blank
+      const predHome = pred.homeTeam || actual.homeTeam;
+      const predAway = pred.awayTeam || actual.awayTeam;
+      if (!predHome || !predAway) return null;
       if (ftH !== ftA) {
-        // FT winner — no ET needed
-        return ftH > ftA ? pred.homeTeam : pred.awayTeam;
+        return ftH > ftA ? predHome : predAway;
       }
-      // FT draw — must have ET
-      if (!pred.goesToET) return null; // draw with no ET = incomplete prediction
+      if (!pred.goesToET) return null;
       const etH = parseInt(pred.etHomeScore), etA = parseInt(pred.etAwayScore);
-      if (isNaN(etH) || isNaN(etA)) return null; // ET scores not filled
+      if (isNaN(etH) || isNaN(etA)) return null;
       if (etH !== etA) {
-        return etH > etA ? pred.homeTeam : pred.awayTeam;
+        return etH > etA ? predHome : predAway;
       }
-      // ET draw — must have pens
-      if (!pred.goesToPens || !pred.penWinner) return null; // pens not filled
+      if (!pred.goesToPens || !pred.penWinner) return null;
       return pred.penWinner;
     })();
 

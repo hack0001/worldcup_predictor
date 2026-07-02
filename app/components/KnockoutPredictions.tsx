@@ -54,7 +54,14 @@ export default function KnockoutPredictions({ player, onUpdate, readonly, confir
   const update = async (matchId: string, patch: Partial<KnockoutPrediction>) => {
     if (readonly) return;
     const current = player.knockoutPredictions[matchId] || { ...EMPTY_PRED };
-    const updated = { ...player, knockoutPredictions: { ...player.knockoutPredictions, [matchId]: { ...current, ...patch } } };
+    // Always ensure homeTeam/awayTeam are set from confirmedTeams so qualifier scoring works
+    const confirmed = confirmedTeams[matchId];
+    const withTeams = {
+      ...current,
+      homeTeam: current.homeTeam || confirmed?.home || "",
+      awayTeam: current.awayTeam || confirmed?.away || "",
+    };
+    const updated = { ...player, knockoutPredictions: { ...player.knockoutPredictions, [matchId]: { ...withTeams, ...patch } } };
     onUpdate(updated);
     await savePlayer(updated);
   };
