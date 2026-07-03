@@ -654,19 +654,37 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                       </div>
 
                       {/* Teams + normal time score */}
+                      {(() => {
+                        const ph = match.placeholder;
+                        const expectedHome = ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[0] : null;
+                        const expectedAway = ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[1] : null;
+                        const mismatch = expectedHome && expectedAway && res.homeTeam && res.awayTeam && (res.homeTeam !== expectedHome || res.awayTeam !== expectedAway);
+                        return (<>
+                        {expectedHome && expectedAway && (
+                          <div style={{ fontSize: "11px", color: mismatch ? "#991b1b" : "var(--text-3)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                            {mismatch && <span style={{ background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: "4px", fontWeight: 700 }}>⚠️ MISMATCH</span>}
+                            Expected: <strong>{expectedHome}</strong> (home) vs <strong>{expectedAway}</strong> (away)
+                            {mismatch && <button style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", border: "none", background: "#ef4444", color: "white", cursor: "pointer", fontWeight: 700 }}
+                              onClick={() => { updateKnockoutResult(match.id, "homeTeam", expectedHome); updateKnockoutResult(match.id, "awayTeam", expectedAway); }}>
+                              Fix
+                            </button>}
+                          </div>
+                        )}
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                           {res.homeTeam && <Flag country={res.homeTeam} size={16} />}
-                          <input type="text" placeholder="Home Team" value={res.homeTeam} onChange={e => updateKnockoutResult(match.id, "homeTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
+                          <input type="text" placeholder={expectedHome || "Home Team"} value={res.homeTeam} onChange={e => updateKnockoutResult(match.id, "homeTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px", borderColor: mismatch ? "#ef4444" : undefined }} />
                         </div>
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.homeScore} onChange={e => updateKnockoutResult(match.id, "homeScore", e.target.value)} />
                         <span style={{ color: "var(--text-3)", fontSize: "11px" }}>–</span>
                         <input className="score-input" type="text" inputMode="numeric" placeholder="–" value={res.awayScore} onChange={e => updateKnockoutResult(match.id, "awayScore", e.target.value)} />
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                           {res.awayTeam && <Flag country={res.awayTeam} size={16} />}
-                          <input type="text" placeholder="Away Team" value={res.awayTeam} onChange={e => updateKnockoutResult(match.id, "awayTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px" }} />
+                          <input type="text" placeholder={expectedAway || "Away Team"} value={res.awayTeam} onChange={e => updateKnockoutResult(match.id, "awayTeam", e.target.value)} style={{ flex: 1, fontSize: "12px", padding: "7px 8px", borderColor: mismatch ? "#ef4444" : undefined }} />
                         </div>
                       </div>
+                        </>);
+                      })()}
 
                       {/* ET checkbox */}
                       <div style={{ borderTop: "1px solid var(--border)", paddingTop: "8px" }}>
