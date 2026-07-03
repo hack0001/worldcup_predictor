@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Player, AdminState } from "@/app/data/types";
-import { KNOCKOUT_MATCHES } from "@/app/data/worldcup";
+import { KNOCKOUT_MATCHES, BRACKET_PROGRESSION } from "@/app/data/worldcup";
 import { getAdminState, getPlayers } from "@/lib/storage";
 import { League, getLeaguesByIds, getPlayersInLeague } from "@/lib/storage";
 
@@ -231,21 +231,63 @@ export default function App() {
     />
   );
 
-  const confirmedTeams = Object.fromEntries([
-    // Auto-populate R32 from the now-confirmed placeholder text
-    ...(KNOCKOUT_MATCHES.r32 || []).map(m => {
-      const adminResult = adminState.results.knockout?.[m.id];
-      const parts = m.placeholder.split(" vs ");
-      return [m.id, {
-        home: adminResult?.homeTeam || parts[0] || "",
-        away: adminResult?.awayTeam || parts[1] || "",
-      }];
-    }),
-    // Later rounds come from admin results only
-    ...Object.entries(adminState.results.knockout || {})
-      .filter(([id]) => !id.startsWith("r32-"))
-      .map(([id, r]) => [id, { home: r.homeTeam || "", away: r.awayTeam || "" }])
-  ]);
+  const confirmedTeams = (() => {
+    const teams: Record<string, { home: string; away: string }> = {};
+    const kr = adminState.results.knockout || {};
+
+    // Helper: get winner of a match by position (home/away)
+    const getWinner = (matchId: string): { home: string; away: string; winner: string | null } => {
+      // For R32, team names come from placeholder
+      const r32Match = (KNOCKOUT_MATCHES.r32 || []).find(m => m.id === matchId);
+      const r = kr[matchId];
+      let home = r?.homeTeam || "";
+      let away = r?.awayTeam || "";
+      // Fill from placeholder if blank
+      if ((!home || !away) && r32Match?.placeholder?.includes(" vs ") && !r32Match.placeholder.startsWith("W")) {
+        const parts = r32Match.placeholder.split(" vs ");
+        home = home || parts[0];
+        away = away || parts[1];
+      }
+      if (!r || !r.homeScore || !r.awayScore) return { home, away, winner: null };
+      const ah = parseInt(r.homeScore), aa = parseInt(r.awayScore);
+      if (isNaN(ah) || isNaN(aa)) return { home, away, winner: null };
+      if (r.wentToPens && r.penWinner) return { home, away, winner: r.penWinner };
+      if (r.wentToET && r.etHomeScore && r.etAwayScore) {
+        const eh = parseInt(r.etHomeScore), ea = parseInt(r.etAwayScore);
+        if (!isNaN(eh) && !isNaN(ea) && eh !== ea) return { home, away, winner: eh > ea ? home : away };
+      }
+      if (ah !== aa) return { home, away, winner: ah > aa ? home : away };
+      return { home, away, winner: null };
+    };
+
+    // R32 — from placeholder directly
+    for (const m of (KNOCKOUT_MATCHES.r32 || [])) {
+      const r = kr[m.id];
+      let home = r?.homeTeam || "";
+      let away = r?.awayTeam || "";
+      if ((!home || !away) && m.placeholder?.includes(" vs ") && !m.placeholder.startsWith("W")) {
+        const parts = m.placeholder.split(" vs ");
+        home = home || parts[0];
+        away = away || parts[1];
+      }
+      teams[m.id] = { home, away };
+    }
+
+    // R16+ — derive winners from completed R32/R16 results via BRACKET_PROGRESSION
+    for (const [nextId, feedStr] of Object.entries(BRACKET_PROGRESSION)) {
+      const [feed1, feed2] = feedStr.split(",");
+      const w1 = getWinner(feed1);
+      const w2 = getWinner(feed2);
+      // Use stored names if admin already set them, else derive from winners
+      const stored = kr[nextId];
+      teams[nextId] = {
+        home: stored?.homeTeam || w1.winner || "",
+        away: stored?.awayTeam || w2.winner || "",
+      };
+    }
+
+    return teams;
+  })();
 
   const PRED_TABS = [
     { id: "board", label: "Leaderboard", emoji: "🏆" },
