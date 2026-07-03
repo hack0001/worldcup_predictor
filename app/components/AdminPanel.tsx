@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { AdminState, PlayerStat, Player, POINTS } from "@/app/data/types";
 import { GROUPS, GROUP_MATCHES, KNOCKOUT_MATCHES, SQUADS, BRACKET_PROGRESSION, GROUP_TO_R32 } from "@/app/data/worldcup";
 import { saveAdminState, getAllPlayerStats, savePlayerStat, deletePlayerStat, getPlayers, savePlayer, sendMessage, getAllLeagues, calculatePlayerPoints } from "@/lib/storage";
@@ -76,6 +76,9 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const [squadPlayers, setSquadPlayers] = useState<{name: string; country: string; position: string; pickedBy: string[]}[]>([]);
   const [showSquadList, setShowSquadList] = useState(false);
   const [selectedMatchForStats, setSelectedMatchForStats] = useState<string>("");
+  const [swapMatchId, setSwapMatchId] = useState("r32-83");
+  const [swapExclude, setSwapExclude] = useState("Vic");
+  const [swapResult, setSwapResult] = useState("");
   const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
@@ -456,7 +459,69 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             }}>🔧 Run Repair</button>
           </div>
 
-          {/* Broadcast Message */}
+          {/* Swap home/away for a specific match */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid #f59e0b" }}>
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>🔄 Swap Home/Away Predictions for Match</p>
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>
+              Use when a placeholder had teams in wrong order. Swaps homeScore↔awayScore and homeTeam↔awayTeam for all users on a specific match (except those you exclude by name).
+            </p>
+            {(() => {
+              return (
+                <div style={{ display: "grid", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ flex: 1 }}>
+                      <label className="label">Match ID</label>
+                      <select value={swapMatchId} onChange={e => setSwapMatchId(e.target.value)} style={{ fontSize: "12px", padding: "5px 8px", width: "100%" }}>
+                        {(KNOCKOUT_MATCHES.r32 || []).map(m => <option key={m.id} value={m.id}>{m.id}: {m.placeholder}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="label">Exclude players (comma-separated names)</label>
+                      <input type="text" value={swapExclude} onChange={e => setSwapExclude(e.target.value)} style={{ fontSize: "12px", padding: "5px 8px", width: "100%", boxSizing: "border-box" as React.CSSProperties["boxSizing"] }} placeholder="e.g. Vic, Rob" />
+                    </div>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px" }}>Preview — predictions that will be swapped:</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                      {users.filter(u => {
+                        const excluded = swapExclude.split(",").map(n => n.trim().toLowerCase());
+                        return !excluded.includes(u.name.toLowerCase()) && u.knockoutPredictions?.[swapMatchId]?.homeScore !== undefined;
+                      }).map(u => {
+                        const p = u.knockoutPredictions[swapMatchId];
+                        return <span key={u.id} style={{ fontSize: "11px", background: "var(--surface2)", borderRadius: "99px", padding: "2px 8px" }}>
+                          {u.name}: {p.homeScore}–{p.awayScore} → {p.awayScore}–{p.homeScore}
+                        </span>;
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button className="btn-secondary" style={{ fontSize: "12px", background: "#f59e0b", borderColor: "#f59e0b", color: "white" }} onClick={async () => {
+                      const excluded = swapExclude.split(",").map(n => n.trim().toLowerCase());
+                      let count = 0;
+                      for (const u of users) {
+                        if (excluded.includes(u.name.toLowerCase())) continue;
+                        const pred = u.knockoutPredictions?.[swapMatchId];
+                        if (pred?.homeScore === undefined) continue;
+                        const swapped = {
+                          ...pred,
+                          homeScore: pred.awayScore, awayScore: pred.homeScore,
+                          homeTeam: pred.awayTeam || "", awayTeam: pred.homeTeam || "",
+                          etHomeScore: pred.etAwayScore || "", etAwayScore: pred.etHomeScore || "",
+                        };
+                        const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [swapMatchId]: swapped } };
+                        await savePlayer(updated);
+                        setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
+                        count++;
+                      }
+                      setSwapResult(`✅ Swapped ${count} predictions for ${swapMatchId}`);
+                    }}>🔄 Swap Now</button>
+                    {swapResult && <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 600 }}>{swapResult}</span>}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
             <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>📢 Broadcast to Chat</p>
             <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>Send a message to all leagues simultaneously from admin</p>
