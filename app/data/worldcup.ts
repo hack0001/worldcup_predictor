@@ -205,7 +205,7 @@ export const KNOCKOUT_MATCHES: Record<string, { id: string; label: string; place
     { id: "r32-82", label: "Match 82", placeholder: "Belgium vs Senegal", dateUK: "1 Jul", timeUK: "21:00 BST", stadium: "Lumen Field", city: "Seattle" },
     { id: "r32-81", label: "Match 81", placeholder: "USA vs Bosnia and Herzegovina", dateUK: "2 Jul", timeUK: "01:00 BST", stadium: "Levi's Stadium", city: "Santa Clara" },
     { id: "r32-84", label: "Match 84", placeholder: "Spain vs Austria", dateUK: "2 Jul", timeUK: "20:00 BST", stadium: "SoFi Stadium", city: "Inglewood" },
-    { id: "r32-83", label: "Match 83", placeholder: "Croatia vs Portugal", dateUK: "3 Jul", timeUK: "00:00 BST", stadium: "BMO Field", city: "Toronto" },
+    { id: "r32-83", label: "Match 83", placeholder: "Portugal vs Croatia", dateUK: "3 Jul", timeUK: "00:00 BST", stadium: "BMO Field", city: "Toronto" },
     { id: "r32-85", label: "Match 85", placeholder: "Switzerland vs Algeria", dateUK: "3 Jul", timeUK: "04:00 BST", stadium: "BC Place", city: "Vancouver" },
     { id: "r32-88", label: "Match 88", placeholder: "Australia vs Egypt", dateUK: "3 Jul", timeUK: "19:00 BST", stadium: "AT&T Stadium", city: "Arlington" },
     { id: "r32-86", label: "Match 86", placeholder: "Argentina vs Cape Verde", dateUK: "3 Jul", timeUK: "23:00 BST", stadium: "Hard Rock Stadium", city: "Miami" },
