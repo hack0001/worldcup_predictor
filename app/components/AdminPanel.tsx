@@ -76,6 +76,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const [squadPlayers, setSquadPlayers] = useState<{name: string; country: string; position: string; pickedBy: string[]}[]>([]);
   const [showSquadList, setShowSquadList] = useState(false);
   const [selectedMatchForStats, setSelectedMatchForStats] = useState<string>("");
+  const [autofillTab, setAutofillTab] = useState<"groups"|"r32"|"r16">("r32");
   const [swapMatchId, setSwapMatchId] = useState("r32-83");
   const [swapExclude, setSwapExclude] = useState("Vic");
   const [swapResult, setSwapResult] = useState("");
@@ -308,7 +309,27 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
 
       {activeSection === "results" && (
         <div>
-          {/* Lock Controls */}
+          {/* Status Dashboard */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>📊 Tournament Status</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {[
+                { label: "Group matches with results", value: `${Object.keys(adminState.results.group || {}).filter(id => adminState.results.group[id].home).length} / ${GROUP_MATCHES.length}`, color: "var(--green)" },
+                { label: "R32 matches with results", value: `${(KNOCKOUT_MATCHES.r32||[]).filter(m => adminState.results.knockout?.[m.id]?.homeScore).length} / ${(KNOCKOUT_MATCHES.r32||[]).length}`, color: "#3b82f6" },
+                { label: "R16 teams confirmed", value: (() => { let c=0; for(const m of (KNOCKOUT_MATCHES.r16||[])) { const kr=adminState.results.knockout||{}; const feeds=({"r16-90":"r32-73,r32-75","r16-89":"r32-74,r32-77","r16-91":"r32-76,r32-78","r16-92":"r32-79,r32-80","r16-93":"r32-83,r32-84","r16-94":"r32-81,r32-82","r16-95":"r32-86,r32-88","r16-96":"r32-85,r32-87"} as Record<string,string>)[m.id]; if(!feeds) continue; const [f1,f2]=feeds.split(","); if(kr[f1]?.homeScore&&kr[f2]?.homeScore) c++; } return `${c} / 8`; })(), color: "#8b5cf6" },
+                { label: "Players with R32 predictions", value: `${users.filter(u => Object.keys(u.knockoutPredictions||{}).some(id => id.startsWith("r32-"))).length} / ${users.length}`, color: "#f59e0b" },
+                { label: "Players with R16 predictions", value: `${users.filter(u => Object.keys(u.knockoutPredictions||{}).some(id => id.startsWith("r16-"))).length} / ${users.length}`, color: "#8b5cf6" },
+                { label: "Fantasy squads locked", value: adminState.fantasyLocked ? "🔒 Locked" : "🔓 Open", color: adminState.fantasyLocked ? "var(--green)" : "#f59e0b" },
+                { label: "Bonus predictions locked", value: adminState.bonusLocked ? "🔒 Locked" : "🔓 Open", color: adminState.bonusLocked ? "var(--green)" : "#f59e0b" },
+                { label: "Registered players", value: `${users.length}`, color: "var(--text-2)" },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ padding: "8px 10px", background: "var(--surface2)", borderRadius: "8px" }}>
+                  <p style={{ fontSize: "10px", color: "var(--text-3)", marginBottom: "2px" }}>{label}</p>
+                  <p style={{ fontSize: "14px", fontWeight: 800, color }}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="card" style={{ padding: "18px", marginBottom: "16px", borderColor: localState.predictionsLocked ? "#fca5a5" : "#bbf7d0", background: localState.predictionsLocked ? "#fef2f2" : "#f0fdf4" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
               <div>
@@ -1939,10 +1960,17 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
         };
         return (
           <div>
-            <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>
-              Matches in the next 96 hours · shows players who haven't predicted · click Auto-fill or fill all at once
-            </p>
-            {upcoming.length === 0 && r32Upcoming.length === 0 && <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)" }}>No matches in next 96 hours</div>}
+            {/* Sub-tabs */}
+            <div style={{ display: "flex", gap: "6px", marginBottom: "16px" }}>
+              <button className={autofillTab === "groups" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("groups")}>⚽ Group Stage</button>
+              <button className={autofillTab === "r32" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("r32")}>⚔️ Round of 32</button>
+              <button className={autofillTab === "r16" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("r16")}>⚔️ Round of 16</button>
+            </div>
+
+            {autofillTab === "groups" && (
+              <div>
+                <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "12px" }}>Group matches in the next 96 hours · shows who hasn't predicted</p>
+                {upcoming.length === 0 && <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-3)" }}>No group matches in next 96 hours</div>}
             <div style={{ display: "grid", gap: "10px" }}>
               {upcoming.map(m => {
                 const home = typeof m.home==="string"?m.home:(m.home as {team:string}).team;
@@ -2004,11 +2032,13 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 );
               })}
             </div>
+              </div>
+            )}
 
-            {/* Knockout R32 predictions */}
-            <div style={{ marginTop: "20px" }}>
-              <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚔️ Round of 32 Predictions</p>
-              <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R32 matches — shows who hasn't entered knockout predictions yet · autofill uses 1-1 score</p>
+            {autofillTab === "r32" && (
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚔️ Round of 32 Predictions</p>
+                <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R32 matches — shows who hasn't entered knockout predictions yet</p>
               <div style={{ display: "grid", gap: "10px" }}>
                 {(KNOCKOUT_MATCHES.r32 || []).sort((a, b) => parseKO(a.dateUK, a.timeUK).getTime() - parseKO(b.dateUK, b.timeUK).getTime()).map(m => {
                   const [home, away] = m.placeholder.split(" vs ");
@@ -2077,6 +2107,99 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 })}
               </div>
             </div>
+            )}
+
+            {autofillTab === "r16" && (
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚔️ Round of 16 Predictions</p>
+                <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>All R16 matches — shows who hasn't entered predictions yet · only shows matches with confirmed teams</p>
+                <div style={{ display: "grid", gap: "10px" }}>
+                  {(KNOCKOUT_MATCHES.r16 || []).sort((a, b) => parseKO(a.dateUK, a.timeUK).getTime() - parseKO(b.dateUK, b.timeUK).getTime()).map(m => {
+                    // Get confirmed teams from bracket progression
+                    const feeds = ({"r16-90":"r32-73,r32-75","r16-89":"r32-74,r32-77","r16-91":"r32-76,r32-78","r16-92":"r32-79,r32-80","r16-93":"r32-83,r32-84","r16-94":"r32-81,r32-82","r16-95":"r32-86,r32-88","r16-96":"r32-85,r32-87"} as Record<string,string>)[m.id]?.split(",") || [];
+                    const getWinner = (matchId: string) => {
+                      const r = adminState.results.knockout?.[matchId];
+                      if (!r?.homeScore) return "";
+                      const ah = parseInt(r.homeScore), aa = parseInt(r.awayScore);
+                      let home = r.homeTeam || ""; let away = r.awayTeam || "";
+                      if (!home || !away) {
+                        const rm = (KNOCKOUT_MATCHES.r32||[]).find(x=>x.id===matchId);
+                        if (rm?.placeholder?.includes(" vs ")) { const p=rm.placeholder.split(" vs "); home=home||p[0]; away=away||p[1]; }
+                      }
+                      if (r.wentToPens && r.penWinner) return r.penWinner;
+                      if (r.wentToET && r.etHomeScore && r.etAwayScore) { const eh=parseInt(r.etHomeScore),ea=parseInt(r.etAwayScore); if(!isNaN(eh)&&!isNaN(ea)&&eh!==ea) return eh>ea?home:away; }
+                      if (!isNaN(ah)&&!isNaN(aa)&&ah!==aa) return ah>aa?home:away;
+                      return "";
+                    };
+                    const home = getWinner(feeds[0]||"");
+                    const away = getWinner(feeds[1]||"");
+                    if (!home || !away) return null; // teams not confirmed yet
+                    const ko = parseKO(m.dateUK, m.timeUK);
+                    const kicked = ko <= now;
+                    const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
+                    const missing = users.filter(u => {
+                      const p = u.knockoutPredictions?.[m.id];
+                      return !p?.homeScore && !p?.awayScore;
+                    });
+                    const done = users.filter(u => {
+                      const p = u.knockoutPredictions?.[m.id];
+                      return p?.homeScore !== undefined && p?.homeScore !== "";
+                    });
+                    return (
+                      <div key={m.id} className="card" style={{ padding: "14px 16px", borderLeft: `3px solid ${kicked ? "#d1d5db" : diffH < 3 ? "#ef4444" : "#8b5cf6"}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                          <div>
+                            <p style={{ fontWeight: 700, fontSize: "14px" }}>{home} vs {away}</p>
+                            <p style={{ fontSize: "11px", color: "var(--text-3)" }}>R16 · {m.dateUK} {m.timeUK} · {kicked ? "🔒 Kicked off" : `${diffH}h away`}</p>
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                            <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700 }}>✓ {done.length}</span>
+                            {missing.length > 0 && (
+                              <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px" }} onClick={async () => {
+                                if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} player(s)?`)) return;
+                                for (const u of missing) {
+                                  const defaultPred = makeKOPred(home, away);
+                                  const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
+                                  await savePlayer(updated);
+                                  setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                                }
+                              }}>⚡ Fill {missing.length}</button>
+                            )}
+                          </div>
+                        </div>
+                        {missing.length > 0 ? (
+                          <div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                              {missing.map(u => (
+                                <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", fontSize: "11px" }}>
+                                  <span>{u.name}</span>
+                                  <button onClick={async () => {
+                                    const defaultPred = makeKOPred(home, away);
+                                    const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: defaultPred } };
+                                    await savePlayer(updated);
+                                    setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                                  }} style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, fontSize: "11px", padding: "0 2px" }}>⚡</button>
+                                </div>
+                              ))}
+                            </div>
+                            {done.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                                {done.map(u => {
+                                  const p = u.knockoutPredictions[m.id];
+                                  return <span key={u.id} style={{ fontSize: "11px", background: "var(--green-light)", borderRadius: "99px", padding: "2px 8px", color: "var(--green)", fontWeight: 600 }}>{u.name}: {p.homeScore}–{p.awayScore}</span>;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✅ All {done.length} players predicted</p>
+                        )}
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
