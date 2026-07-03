@@ -313,35 +313,39 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
     const actualAwayScore = parseInt(actual.awayScore);
     if (isNaN(actualHomeScore) || isNaN(actualAwayScore)) continue; // no result yet
 
-    const winner = actual.wentToPens && actual.penWinner
-      ? actual.penWinner
-      : actual.wentToET && actual.etHomeScore && actual.etAwayScore
-        ? (parseInt(actual.etHomeScore) > parseInt(actual.etAwayScore) ? actual.homeTeam : actual.awayTeam)
-        : !isNaN(actualHomeScore) && !isNaN(actualAwayScore) && actualHomeScore !== actualAwayScore
-          ? (actualHomeScore > actualAwayScore ? actual.homeTeam : actual.awayTeam)
-          : null;
+    // Use HOME/AWAY position to determine winner — immune to team name mismatches in admin data
+    const actualWinnerPos = (() => {
+      if (actual.wentToPens && actual.penWinner) {
+        if (actual.penWinner === actual.homeTeam) return "home";
+        if (actual.penWinner === actual.awayTeam) return "away";
+        return null;
+      }
+      if (actual.wentToET && actual.etHomeScore && actual.etAwayScore) {
+        const eh = parseInt(actual.etHomeScore), ea = parseInt(actual.etAwayScore);
+        if (!isNaN(eh) && !isNaN(ea) && eh !== ea) return eh > ea ? "home" : "away";
+      }
+      if (actualHomeScore !== actualAwayScore) return actualHomeScore > actualAwayScore ? "home" : "away";
+      return null;
+    })();
 
-    const predWinner = (() => {
+    const predWinnerPos = (() => {
       const ftH = parseInt(pred.homeScore), ftA = parseInt(pred.awayScore);
       if (isNaN(ftH) || isNaN(ftA)) return null;
-      // Use actual team names as fallback if pred.homeTeam/awayTeam are blank
-      const predHome = pred.homeTeam || actual.homeTeam;
-      const predAway = pred.awayTeam || actual.awayTeam;
-      if (!predHome || !predAway) return null;
-      if (ftH !== ftA) {
-        return ftH > ftA ? predHome : predAway;
-      }
+      if (ftH !== ftA) return ftH > ftA ? "home" : "away";
       if (!pred.goesToET) return null;
       const etH = parseInt(pred.etHomeScore), etA = parseInt(pred.etAwayScore);
       if (isNaN(etH) || isNaN(etA)) return null;
-      if (etH !== etA) {
-        return etH > etA ? predHome : predAway;
-      }
+      if (etH !== etA) return etH > etA ? "home" : "away";
       if (!pred.goesToPens || !pred.penWinner) return null;
-      return pred.penWinner;
+      // Map pen winner name to position using pred team names (with fallback to actual)
+      const predHome = pred.homeTeam || actual.homeTeam;
+      const predAway = pred.awayTeam || actual.awayTeam;
+      if (pred.penWinner === predHome) return "home";
+      if (pred.penWinner === predAway) return "away";
+      return null;
     })();
 
-    if (winner && predWinner && winner === predWinner && correctResult) {
+    if (actualWinnerPos && predWinnerPos && actualWinnerPos === predWinnerPos) {
       if (isEarly) add("Correct qualifier (R32/R16)", POINTS.EARLY_KO_CORRECT_QUALIFIER);
       if (stage === "qf") add("Correct quarter-finalist", POINTS.CORRECT_QUARTER_FINALIST);
       if (stage === "sf") add("Correct semi-finalist", POINTS.CORRECT_SEMI_FINALIST);
