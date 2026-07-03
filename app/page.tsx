@@ -218,19 +218,6 @@ export default function App() {
     <LeagueSelector player={currentPlayer} onLeagueSelected={handleLeagueSelected} />
   );
 
-  // Home
-  if (section === "home") return (
-    <HomeScreen
-      player={currentPlayer}
-      league={currentLeague}
-      onNav={navTo}
-      onUpdate={updatePlayer}
-      onLogout={handleLogout}
-      adminClickCount={adminClicks}
-      onAdminClick={handleAdminClick}
-    />
-  );
-
   const confirmedTeams = (() => {
     const teams: Record<string, { home: string; away: string }> = {};
     const kr = adminState.results.knockout || {};
@@ -288,6 +275,24 @@ export default function App() {
 
     return teams;
   })();
+
+
+    // Home
+  if (section === "home") return (
+    <HomeScreen
+      player={currentPlayer}
+      league={currentLeague}
+      onNav={navTo}
+      onUpdate={updatePlayer}
+      onLogout={handleLogout}
+      adminClickCount={adminClicks}
+      onAdminClick={handleAdminClick}
+      confirmedTeams={confirmedTeams}
+      allPlayers={leaguePlayers}
+      adminState={adminState as {results:{knockout:Record<string,{homeScore?:string;awayScore?:string;homeTeam?:string;awayTeam?:string;wentToPens?:boolean;penWinner?:string;wentToET?:boolean;etHomeScore?:string;etAwayScore?:string}>}}}
+    />
+  );
+
 
   const PRED_TABS = [
     { id: "board", label: "Leaderboard", emoji: "🏆" },
