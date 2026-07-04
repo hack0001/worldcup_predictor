@@ -77,9 +77,6 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const [showSquadList, setShowSquadList] = useState(false);
   const [selectedMatchForStats, setSelectedMatchForStats] = useState<string>("");
   const [autofillTab, setAutofillTab] = useState<"groups"|"r32"|"r16">("r32");
-  const [swapMatchId, setSwapMatchId] = useState("r32-83");
-  const [swapExclude, setSwapExclude] = useState("Vic");
-  const [swapResult, setSwapResult] = useState("");
   const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
@@ -480,88 +477,55 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             }}>🔧 Run Repair</button>
           </div>
 
-          {/* Swap home/away for a specific match */}
-          <div className="card" style={{ padding: "14px 16px", marginBottom: "16px", borderLeft: "3px solid #f59e0b" }}>
-            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>🔄 Swap Home/Away Predictions for Match</p>
-            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>
-              Use when a placeholder had teams in wrong order. Swaps homeScore↔awayScore and homeTeam↔awayTeam for all users on a specific match (except those you exclude by name).
-            </p>
-            {(() => {
-              return (
-                <div style={{ display: "grid", gap: "8px" }}>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <div style={{ flex: 1 }}>
-                      <label className="label">Match ID</label>
-                      <select value={swapMatchId} onChange={e => setSwapMatchId(e.target.value)} style={{ fontSize: "12px", padding: "5px 8px", width: "100%" }}>
-                        {(KNOCKOUT_MATCHES.r32 || []).map(m => <option key={m.id} value={m.id}>{m.id}: {m.placeholder}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label className="label">Exclude players (comma-separated names)</label>
-                      <input type="text" value={swapExclude} onChange={e => setSwapExclude(e.target.value)} style={{ fontSize: "12px", padding: "5px 8px", width: "100%", boxSizing: "border-box" as React.CSSProperties["boxSizing"] }} placeholder="e.g. Vic, Rob" />
-                    </div>
-                  </div>
-                  <div>
-                    <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "4px" }}>Preview — predictions that will be swapped:</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
-                      {users.filter(u => {
-                        const excluded = swapExclude.split(",").map(n => n.trim().toLowerCase());
-                        return !excluded.includes(u.name.toLowerCase()) && u.knockoutPredictions?.[swapMatchId]?.homeScore !== undefined;
-                      }).map(u => {
-                        const p = u.knockoutPredictions[swapMatchId];
-                        return <span key={u.id} style={{ fontSize: "11px", background: "var(--surface2)", borderRadius: "99px", padding: "2px 8px" }}>
-                          {u.name}: {p.homeScore}–{p.awayScore} → {p.awayScore}–{p.homeScore}
-                        </span>;
-                      })}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button className="btn-secondary" style={{ fontSize: "12px", background: "#f59e0b", borderColor: "#f59e0b", color: "white" }} onClick={async () => {
-                      const excluded = swapExclude.split(",").map(n => n.trim().toLowerCase());
-                      let count = 0;
-                      for (const u of users) {
-                        if (excluded.includes(u.name.toLowerCase())) continue;
-                        const pred = u.knockoutPredictions?.[swapMatchId];
-                        if (pred?.homeScore === undefined) continue;
-                        const swapped = {
-                          ...pred,
-                          homeScore: pred.awayScore, awayScore: pred.homeScore,
-                          homeTeam: pred.awayTeam || "", awayTeam: pred.homeTeam || "",
-                          etHomeScore: pred.etAwayScore || "", etAwayScore: pred.etHomeScore || "",
-                        };
-                        const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [swapMatchId]: swapped } };
-                        await savePlayer(updated);
-                        setUsers(prev => prev.map(p => p.id === u.id ? updated : p));
-                        count++;
-                      }
-                      setSwapResult(`✅ Swapped ${count} predictions for ${swapMatchId}`);
-                    }}>🔄 Swap Now</button>
-                    {swapResult && <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 600 }}>{swapResult}</span>}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-
           <div className="card" style={{ padding: "14px 16px", marginBottom: "16px" }}>
-            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>📢 Broadcast to Chat</p>
-            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>Send a message to all leagues simultaneously from admin</p>
-            {[
-              "🚨 The Round of 32 has started! Head to the Knockouts tab to enter your predictions NOW before matches kick off!",
-              "🔒 Bonus predictions (Golden Boot, Top Assist, Winner, Player of Tournament) are now locked!",
-              "👕 Fantasy squad selections are now locked — no more changes!",
-            ].map(msg => (
-              <button key={msg} className="btn-secondary" style={{ display: "block", width: "100%", textAlign: "left", marginBottom: "6px", fontSize: "12px", padding: "8px 10px" }}
-                onClick={async () => {
-                  if (!confirm(`Send to all leagues: "${msg.substring(0,60)}..."`)) return;
-                  // Send to all known league IDs + no league
+            <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>📢 Broadcast to Chat</p>
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "10px" }}>Sends to all leagues simultaneously as admin. Use quick buttons or write your own.</p>
+            {/* Custom message */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+              <input
+                type="text"
+                placeholder="Type a custom message..."
+                id="broadcastInput"
+                style={{ flex: 1, fontSize: "13px", padding: "7px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                onKeyDown={async e => {
+                  if (e.key !== "Enter") return;
+                  const msg = (e.target as HTMLInputElement).value.trim();
+                  if (!msg) return;
+                  if (!confirm(`Broadcast to all leagues: "${msg.substring(0,60)}${msg.length>60?"...":""}"?`)) return;
                   const leagues = await getAllLeagues();
-                  for (const l of leagues) {
-                    await sendMessage(currentPlayerId, `📢 ${msg}`, "", "", l.id);
-                  }
+                  for (const l of leagues) await sendMessage(currentPlayerId, `📢 ${msg}`, "", "", l.id);
+                  (e.target as HTMLInputElement).value = "";
+                  alert("Sent!");
+                }}
+              />
+              <button className="btn-primary" style={{ fontSize: "12px", flexShrink: 0 }} onClick={async () => {
+                const input = document.getElementById("broadcastInput") as HTMLInputElement;
+                const msg = input?.value.trim();
+                if (!msg) return;
+                if (!confirm(`Broadcast to all leagues: "${msg.substring(0,60)}${msg.length>60?"...":""}"?`)) return;
+                const leagues = await getAllLeagues();
+                for (const l of leagues) await sendMessage(currentPlayerId, `📢 ${msg}`, "", "", l.id);
+                if (input) input.value = "";
+                alert("Sent!");
+              }}>Send</button>
+            </div>
+            {/* Quick buttons */}
+            <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "6px", fontWeight: 600 }}>Quick messages:</p>
+            {[
+              "🚨 Round of 16 has started! Head to Knockouts tab and enter your predictions NOW!",
+              "⚔️ Round of 32 predictions are now open — go to Knockouts and get your picks in!",
+              "🔒 Bonus predictions (Golden Boot, Top Assist, Winner, POTT) are now locked!",
+              "👕 Fantasy squad selections are now locked — no more changes!",
+              "📊 Leaderboard has been updated — check your points!",
+            ].map(msg => (
+              <button key={msg} className="btn-ghost" style={{ display: "block", width: "100%", textAlign: "left", marginBottom: "4px", fontSize: "12px", padding: "6px 10px" }}
+                onClick={async () => {
+                  if (!confirm(`Broadcast: "${msg.substring(0,60)}..."?`)) return;
+                  const leagues = await getAllLeagues();
+                  for (const l of leagues) await sendMessage(currentPlayerId, `📢 ${msg}`, "", "", l.id);
                   alert("Sent!");
                 }}>
-                {msg.substring(0, 80)}…
+                {msg}
               </button>
             ))}
           </div>
