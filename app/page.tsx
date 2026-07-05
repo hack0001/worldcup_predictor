@@ -479,7 +479,7 @@ export default function App() {
         </div>
       </div>
       <div style={{ padding: "16px" }}>
-        <AdminPanel adminState={adminState} onUpdate={setAdminState} currentPlayerId={currentPlayer.id} />
+        <AdminPanel adminState={adminState} onUpdate={setAdminState} currentPlayerId={currentPlayer.id} confirmedTeams={confirmedTeams} />
       </div>
     </div>
   );

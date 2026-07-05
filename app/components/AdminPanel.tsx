@@ -12,6 +12,7 @@ interface Props {
   onUpdate: (state: AdminState) => void;
   onClose?: () => void;
   currentPlayerId?: string;
+  confirmedTeams?: Record<string, { home: string; away: string }>;
 }
 
 
@@ -63,7 +64,7 @@ function QuickStatRow({ player, matchStat, matchId, matchLabel, onSave }: {
   );
 }
 
-export default function AdminPanel({ adminState, onUpdate, onClose, currentPlayerId = "admin" }: Props) {
+export default function AdminPanel({ adminState, onUpdate, onClose, currentPlayerId = "admin", confirmedTeams = {} }: Props) {
   const [authenticated] = useState(true); // Auth handled by page-level login
   const [activeSection, setActiveSection] = useState<"results" | "stats" | "users" | "form" | "leagues" | "autofill" | "audit">("results");
   const [viewingUser, setViewingUser] = useState<Player | null>(null);
@@ -87,6 +88,25 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const [activeGroup, setActiveGroup] = useState<string>("A");
   const [activeKnockoutRound, setActiveKnockoutRound] = useState<"r32" | "r16" | "qf" | "sf" | "final">("r32");
   const [localState, setLocalState] = useState<AdminState>(adminState);
+
+  // Auto-populate missing team names in localState from confirmedTeams whenever it updates
+  useEffect(() => {
+    const newKO = { ...localState.results.knockout };
+    let changed = false;
+    for (const [id, ct] of Object.entries(confirmedTeams)) {
+      if (!ct.home || !ct.away) continue;
+      const existing = newKO[id];
+      if (!existing?.homeTeam || !existing?.awayTeam) {
+        newKO[id] = { ...(existing || { ...EMPTY_KO_RESULT }), homeTeam: ct.home, awayTeam: ct.away };
+        changed = true;
+      }
+    }
+    if (changed) {
+      const updated = { ...localState, results: { ...localState.results, knockout: newKO } };
+      setLocalState(updated);
+      saveAdminState(updated).then(() => onUpdate(updated));
+    }
+  }, [JSON.stringify(confirmedTeams)]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [stats, setStats] = useState<PlayerStat[]>([]);
@@ -199,15 +219,20 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
     const isScore = ["homeScore", "awayScore", "etHomeScore", "etAwayScore"].includes(field);
     const v = isScore && typeof value === "string" ? value.replace(/\D/g, "").slice(0, 2) : value;
     let current = localState.results.knockout[matchId] || { ...EMPTY_KO_RESULT };
-    // Pre-fill team names from placeholder for any round if blank
+    // Pre-fill team names from confirmedTeams for any round if blank
     if (!current.homeTeam || !current.awayTeam) {
-      // Check all knockout rounds for a placeholder with real team names
-      for (const matches of Object.values(KNOCKOUT_MATCHES)) {
-        const m = (matches as {id:string;placeholder?:string}[]).find(m => m.id === matchId);
-        if (m?.placeholder && !m.placeholder.startsWith("W") && m.placeholder.includes(" vs ")) {
-          const [ph, pa] = m.placeholder.split(" vs ");
-          current = { ...current, homeTeam: current.homeTeam || ph, awayTeam: current.awayTeam || pa };
-          break;
+      const ct = confirmedTeams[matchId];
+      if (ct?.home || ct?.away) {
+        current = { ...current, homeTeam: current.homeTeam || ct.home, awayTeam: current.awayTeam || ct.away };
+      } else {
+        // Fallback: check all knockout rounds for a placeholder with real team names
+        for (const matches of Object.values(KNOCKOUT_MATCHES)) {
+          const m = (matches as {id:string;placeholder?:string}[]).find(m => m.id === matchId);
+          if (m?.placeholder && !m.placeholder.startsWith("W") && m.placeholder.includes(" vs ")) {
+            const [ph, pa] = m.placeholder.split(" vs ");
+            current = { ...current, homeTeam: current.homeTeam || ph, awayTeam: current.awayTeam || pa };
+            break;
+          }
         }
       }
     }
@@ -440,14 +465,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             <p style={{ fontSize: "11px", color: "var(--text-3)", marginBottom: "8px" }}>Fixes missing homeTeam/awayTeam in saved knockout predictions — required for correct qualifier scoring. Safe to run multiple times.</p>
             <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
               // Build team name lookup from R32 placeholders + later round admin results
-              const teamLookup: Record<string, { home: string; away: string }> = {};
-              for (const m of (KNOCKOUT_MATCHES.r32 || [])) {
-                if (m.placeholder?.includes(" vs ")) {
-                  const [h, a] = m.placeholder.split(" vs ");
-                  teamLookup[m.id] = { home: h, away: a };
-                }
-              }
-              // Later rounds from admin results
+              const teamLookup: Record<string, { home: string; away: string }> = { ...confirmedTeams };
+              // Also include any admin-stored team names as override
               for (const [id, r] of Object.entries(adminState.results.knockout || {})) {
                 if (r.homeTeam && r.awayTeam) teamLookup[id] = { home: r.homeTeam, away: r.awayTeam };
               }
@@ -625,11 +644,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 {KNOCKOUT_MATCHES[activeKnockoutRound].map((match) => {
                   const stored = localState.results.knockout[match.id];
                   let res = stored ? { ...stored } : { ...EMPTY_KO_RESULT };
-                  // Pre-fill team names from confirmed placeholder whenever empty
-                  // For R32: use placeholder directly. For later rounds: placeholder has "W79 vs W80" so skip it
-                  if ((!res.homeTeam || !res.awayTeam) && match.placeholder?.includes(" vs ") && !match.placeholder.startsWith("W")) {
-                    const [ph, pa] = match.placeholder.split(" vs ");
-                    res = { ...res, homeTeam: res.homeTeam || ph, awayTeam: res.awayTeam || pa };
+                  // Pre-fill team names from confirmedTeams (covers all rounds including R16+)
+                  if (!res.homeTeam || !res.awayTeam) {
+                    const ct = confirmedTeams[match.id];
+                    res = { ...res, homeTeam: res.homeTeam || ct?.home || "", awayTeam: res.awayTeam || ct?.away || "" };
                   }
                   return (
                     <div key={match.id} className="card" style={{ padding: "14px" }}>
@@ -641,8 +659,10 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                       {/* Teams + normal time score */}
                       {(() => {
                         const ph = match.placeholder;
-                        const expectedHome = ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[0] : null;
-                        const expectedAway = ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[1] : null;
+                        const ct = confirmedTeams[match.id];
+                        // Use confirmedTeams for real team names, fall back to placeholder for R32
+                        const expectedHome = ct?.home || (ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[0] : null);
+                        const expectedAway = ct?.away || (ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[1] : null);
                         const mismatch = expectedHome && expectedAway && res.homeTeam && res.awayTeam && (res.homeTeam !== expectedHome || res.awayTeam !== expectedAway);
                         return (<>
                         {expectedHome && expectedAway && (
@@ -1352,8 +1372,11 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                           <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-3)", marginBottom: "5px" }}>{label.toUpperCase()}</p>
                           {matches.map(m => {
                             const ph = (m as {placeholder?:string}).placeholder;
-                            const homeTeam = ph ? ph.split(" vs ")[0] : (m as {homeTeam?:string}).homeTeam || "TBD";
-                            const awayTeam = ph ? ph.split(" vs ")[1] : (m as {awayTeam?:string}).awayTeam || "TBD";
+                            const ct = confirmedTeams[m.id];
+                            // Use confirmedTeams first (covers all rounds), fall back to placeholder splitting
+                            const homeTeam = ct?.home || (ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[0] : "") || (m as {homeTeam?:string}).homeTeam || "";
+                            const awayTeam = ct?.away || (ph && !ph.startsWith("W") && ph.includes(" vs ") ? ph.split(" vs ")[1] : "") || (m as {awayTeam?:string}).awayTeam || "";
+                            if (!homeTeam || !awayTeam) return null; // skip unconfirmed R16+ matches
                             const pred = koPreds[m.id];
                             const ko = parseKO(m.dateUK, m.timeUK);
                             const locked = ko <= now;
