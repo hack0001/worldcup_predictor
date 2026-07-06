@@ -2191,7 +2191,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
         );
       })()}
       {activeSection === "audit" && (() => {
-        // Build a fake adminState with no knockout results to get pre-KO score
+        // Recalculates live from current adminState + users on every render — always up to date
         const adminNoKO = { ...adminState, results: { ...adminState.results, knockout: {} } };
 
         const leaderboard = users.map(u => {
@@ -2260,8 +2260,15 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
         return (
           <div>
             <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
-              Full knockout audit — pre-KO score shown at top, points column per match, totals at bottom. Verify against leaderboard.
+              Full knockout audit — recalculates live. Points column per match, totals at bottom.
             </p>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px", alignItems: "center" }}>
+              <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
+                const fresh = await getPlayers();
+                setUsers(fresh);
+              }}>🔄 Refresh Player Data</button>
+              <span style={{ fontSize: "11px", color: "var(--text-3)" }}>Auto-updates when results or users change · {new Date().toLocaleTimeString("en-GB")}</span>
+            </div>
 
             {leaderboard.map(({ player, total, breakdown, preKO }) => {
               const koTotal = total - preKO;
