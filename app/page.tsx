@@ -369,7 +369,7 @@ export default function App() {
         </div>
       </div>
       <div style={{ padding: "16px" }}>
-        <FixturesView player={currentPlayer} />
+        <FixturesView player={currentPlayer} confirmedTeams={confirmedTeams} />
       </div>
     </div>
   );
