@@ -7,7 +7,7 @@ import { GROUP_MATCHES, KNOCKOUT_MATCHES } from "@/app/data/worldcup";
 interface Props {
   player: Player;
   league: League;
-  onNav: (section: "predictions" | "fantasy" | "profile" | "leagueSwitch" | "admin" | "quiz") => void;
+  onNav: (section: "predictions" | "profile" | "leagueSwitch" | "admin" | "quiz") => void;
   onUpdate: (player: Player) => void;
   onLogout: () => void;
   adminClickCount: number;
@@ -147,70 +147,6 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
       {/* ── Main nav cards ── */}
       <div style={{ flex: 1, padding: "16px" }}>
         <div style={{ display: "grid", gap: "12px" }}>
-          {/* Upcoming fixtures — inline predict */}
-          {(() => {
-            const now = new Date();
-            const in72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
-            const upcoming = GROUP_MATCHES.filter(m => {
-              const ko = parseKickoff(m.dateUK, m.timeUK);
-              const pred = player.groupPredictions[m.id];
-              const hasPred = pred?.home !== "" && pred?.home !== undefined && pred?.away !== "" && pred?.away !== undefined;
-              return ko > now && ko <= in72h && !hasPred;
-            }).slice(0, 6);
-            if (!upcoming.length) return null;
-            return (
-              <div>
-                <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", marginBottom: "8px" }}>⏰ Predict before kickoff</p>
-                <div style={{ display: "grid", gap: "8px" }}>
-                  {upcoming.map(m => {
-                    const home = typeof m.home === "string" ? m.home : m.home.team;
-                    const away = typeof m.away === "string" ? m.away : m.away.team;
-                    const ko = parseKickoff(m.dateUK, m.timeUK);
-                    const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
-                    const timeLabel = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : `${m.dateUK}`;
-                    const local = localPreds[m.id] || { home: "", away: "" };
-                    const isSaving = saving === m.id;
-                    const canSave = local.home !== "" && local.away !== "";
-
-                    return (
-                      <div key={m.id} className="card" style={{ padding: "10px 12px", borderLeft: `3px solid ${diffH < 3 ? "#ef4444" : "#f59e0b"}` }}>
-                        {/* Time */}
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", color: "var(--text-3)" }}>Group {m.group} · {m.city}</span>
-                          <span style={{ fontSize: "11px", fontWeight: 700, color: diffH < 3 ? "#ef4444" : "#f59e0b" }}>{timeLabel} to go</span>
-                        </div>
-                        {/* Teams + score inputs */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600, textAlign: "right" }}>{home}</span>
-                          <input
-                            type="text" inputMode="numeric" placeholder="–" maxLength={2}
-                            value={local.home}
-                            onChange={e => setLocalPreds(prev => ({ ...prev, [m.id]: { ...local, home: e.target.value.replace(/[^0-9]/g, "") } }))}
-                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }}
-                          />
-                          <span style={{ color: "var(--text-3)", fontWeight: 700 }}>–</span>
-                          <input
-                            type="text" inputMode="numeric" placeholder="–" maxLength={2}
-                            value={local.away}
-                            onChange={e => setLocalPreds(prev => ({ ...prev, [m.id]: { ...local, away: e.target.value.replace(/[^0-9]/g, "") } }))}
-                            style={{ width: 44, textAlign: "center", fontWeight: 800, fontSize: "18px", padding: "6px 4px" }}
-                          />
-                          <span style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{away}</span>
-                          <button
-                            type="button" onClick={() => savePred(m.id, local.home, local.away)}
-                            disabled={!canSave || isSaving}
-                            style={{ padding: "6px 12px", borderRadius: "8px", border: "none", background: canSave ? "var(--green)" : "var(--border)", color: canSave ? "white" : "var(--text-3)", fontWeight: 700, fontSize: "12px", cursor: canSave ? "pointer" : "default", flexShrink: 0 }}
-                          >
-                            {isSaving ? "..." : "✓"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Knockout R32 — inline predict all */}
           {(() => {
@@ -485,29 +421,6 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
             </div>
           </button>
 
-          {/* Fantasy */}
-          <button
-            onClick={() => onNav("fantasy")}
-            style={{
-              padding: "0", borderRadius: "14px", border: "none", cursor: "pointer",
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-              boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
-              overflow: "hidden", textAlign: "left",
-            }}
-          >
-            <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>
-                👕
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>Fantasy</p>
-                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Pick your World Cup XI</p>
-                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", marginTop: "1px" }}>Squad · Fantasy Leaderboard</p>
-              </div>
-              <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
-            </div>
-          </button>
-
           {/* Quiz */}
           <button
             onClick={() => onNav("quiz" as Parameters<typeof onNav>[0])}
@@ -518,21 +431,6 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
               <div style={{ flex: 1 }}>
                 <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>World Cup Quiz <span style={{ fontSize: "11px", background: "#ef4444", borderRadius: "99px", padding: "2px 7px", fontWeight: 700, verticalAlign: "middle", marginLeft: "4px" }}>NEW</span></p>
                 <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>19 knockout questions · fresh slate</p>
-              </div>
-              <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
-            </div>
-          </button>
-
-          {/* Fixtures */}
-          <button
-            onClick={() => onNav("fixtures" as Parameters<typeof onNav>[0])}
-            style={{ padding: "0", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(135deg, #0369a1, #0284c7)", boxShadow: "0 4px 14px rgba(3,105,161,0.3)", overflow: "hidden", textAlign: "left" }}
-          >
-            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>📅</div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 800, fontSize: "18px", color: "white" }}>Fixtures</p>
-                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Next 96 hours · your predictions</p>
               </div>
               <span style={{ fontSize: "22px", color: "rgba(255,255,255,0.6)" }}>→</span>
             </div>

@@ -24,7 +24,7 @@ import AdminPanel from "@/app/components/AdminPanel";
 import { supabase } from "@/lib/supabase";
 import { getAllPlayerStats, getAllFantasySquads } from "@/lib/storage";
 
-type Section = "home" | "predictions" | "fantasy" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz" | "fixtures";
+type Section = "home" | "predictions" | "profile" | "admin" | "adminLogin" | "leagueSwitch" | "quiz" | "fixtures";
 type PredTab = "groups" | "knockout" | "board" | "standings" | "teams" | "chat" | "polls";
 type FanTab = "squad" | "board";
 
@@ -360,43 +360,6 @@ export default function App() {
   );
 
   // Fantasy section
-  if (section === "fantasy") return (
-    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)", padding: "16px 16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => setSection("home")} style={{ color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px" }}>← Home</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: "16px", color: "white" }}>👕 Fantasy</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)" }}>{currentLeague.name}</p>
-          </div>
-          <AvatarDisplay url={currentPlayer.avatarUrl} name={currentPlayer.name} size={32} />
-        </div>
-        <div style={{ display: "flex", gap: "2px", overflowX: "auto" }}>
-          {FAN_TABS.map(t => (
-            <button key={t.id} onClick={() => setFanTab(t.id as FanTab)} style={{
-              padding: "8px 16px", fontSize: "12px", fontWeight: fanTab === t.id ? 800 : 500,
-              border: "none", cursor: "pointer", whiteSpace: "nowrap", borderRadius: "8px 8px 0 0",
-              background: fanTab === t.id ? "var(--bg)" : "transparent",
-              color: fanTab === t.id ? "#3b82f6" : "rgba(255,255,255,0.7)",
-              borderBottom: fanTab === t.id ? "3px solid #3b82f6" : "3px solid transparent",
-            }}>{t.emoji} {t.label}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: "16px 16px 32px" }}>
-        {fanTab === "squad" && <FantasySquadPicker player={currentPlayer} fantasyLocked={adminState.fantasyLocked} />}
-        {fanTab === "board" && <FantasyLeaderboard
-          players={allPlayers.some(p => p.id === currentPlayer.id) ? allPlayers : (fantasySquads.some(s => s.playerId === currentPlayer.id && s.squad?.length > 0) ? [...allPlayers, currentPlayer] : allPlayers)}
-          squads={fantasySquads}
-          stats={playerStats}
-          currentPlayerId={currentPlayer.id}
-        />}
-      </div>
-    </div>
-  );
-
-  // Fixtures
   if (section === "fixtures") return (
     <div style={{ maxWidth: "700px", margin: "0 auto" }}>
       <div style={{ background: "linear-gradient(135deg, #0369a1, #0284c7)", padding: "16px 16px 0" }}>
