@@ -77,7 +77,7 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
   const [squadPlayers, setSquadPlayers] = useState<{name: string; country: string; position: string; pickedBy: string[]}[]>([]);
   const [showSquadList, setShowSquadList] = useState(false);
   const [selectedMatchForStats, setSelectedMatchForStats] = useState<string>("");
-  const [autofillTab, setAutofillTab] = useState<"groups"|"r32"|"r16">("r32");
+  const [autofillTab, setAutofillTab] = useState<"groups"|"r32"|"r16"|"qf"|"sf"|"final">("qf");
   const [fetchingStats, setFetchingStats] = useState(false);
   const [allLeagues, setAllLeagues] = useState<{ id: string; name: string; code: string; created_at: string }[]>([]);
   const [leaguePlayerCounts, setLeaguePlayerCounts] = useState<Record<string, number>>({});
@@ -1952,6 +1952,9 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
               <button className={autofillTab === "groups" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("groups")}>⚽ Group Stage</button>
               <button className={autofillTab === "r32" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("r32")}>⚔️ Round of 32</button>
               <button className={autofillTab === "r16" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("r16")}>⚔️ Round of 16</button>
+              <button className={autofillTab === "qf" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("qf")}>⚽ Quarter Finals</button>
+              <button className={autofillTab === "sf" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("sf")}>🏅 Semi Finals</button>
+              <button className={autofillTab === "final" ? "btn-primary" : "btn-secondary"} style={{ fontSize: "12px" }} onClick={() => setAutofillTab("final")}>🏆 Final</button>
             </div>
 
             {autofillTab === "groups" && (
@@ -2187,6 +2190,84 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 </div>
               </div>
             )}
+
+            {["qf","sf","final"].map(roundKey => {
+              if (autofillTab !== roundKey) return null;
+              const roundMatches = (KNOCKOUT_MATCHES[roundKey as keyof typeof KNOCKOUT_MATCHES] || []) as {id:string;dateUK:string;timeUK:string;stadium:string;city:string;placeholder?:string}[];
+              const labels: Record<string,string> = { qf:"Quarter Finals", sf:"Semi Finals", final:"Final" };
+              return (
+                <div key={roundKey}>
+                  <p style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>⚽ {labels[roundKey]} Predictions</p>
+                  <p style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "12px" }}>Only shows when teams are confirmed from previous round results</p>
+                  <div style={{ display: "grid", gap: "10px" }}>
+                    {roundMatches.map(m => {
+                      const home = confirmedTeams?.[m.id]?.home || "";
+                      const away = confirmedTeams?.[m.id]?.away || "";
+                      if (!home || !away) return (
+                        <div key={m.id} className="card" style={{ padding: "10px 14px", opacity: 0.5 }}>
+                          <p style={{ fontSize: "12px", color: "var(--text-3)" }}>{m.id} — teams not yet confirmed</p>
+                        </div>
+                      );
+                      const ko = parseKO(m.dateUK, m.timeUK);
+                      const kicked = ko <= now;
+                      const diffH = Math.round((ko.getTime() - now.getTime()) / 3600000);
+                      const missing = users.filter(u => { const p = u.knockoutPredictions?.[m.id]; return !p?.homeScore && !p?.awayScore; });
+                      const done = users.filter(u => { const p = u.knockoutPredictions?.[m.id]; return p?.homeScore !== undefined && p?.homeScore !== ""; });
+                      return (
+                        <div key={m.id} className="card" style={{ padding: "14px 16px", borderLeft: `3px solid ${kicked?"#d1d5db":diffH<3?"#ef4444":"#f59e0b"}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                            <div>
+                              <p style={{ fontWeight: 700, fontSize: "14px" }}>{home} vs {away}</p>
+                              <p style={{ fontSize: "11px", color: "var(--text-3)" }}>{labels[roundKey]} · {m.dateUK} {m.timeUK} · {kicked ? "🔒 Kicked off" : `${diffH}h away`}</p>
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                              <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 700 }}>✓ {done.length}</span>
+                              {missing.length > 0 && (
+                                <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 10px" }} onClick={async () => {
+                                  if (!confirm(`Auto-fill ${home} vs ${away} for ${missing.length} player(s)?`)) return;
+                                  for (const u of missing) {
+                                    const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: makeKOPred(home, away) } };
+                                    await savePlayer(updated);
+                                    setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                                  }
+                                }}>⚡ Fill {missing.length}</button>
+                              )}
+                            </div>
+                          </div>
+                          {missing.length > 0 ? (
+                            <div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                {missing.map(u => (
+                                  <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#fee2e2", borderRadius: "99px", padding: "2px 8px", fontSize: "11px" }}>
+                                    <span style={{ color:"#991b1b", fontWeight:600 }}>{u.name}</span>
+                                    <button onClick={async () => {
+                                      const updated = { ...u, knockoutPredictions: { ...u.knockoutPredictions, [m.id]: makeKOPred(home, away) } };
+                                      await savePlayer(updated);
+                                      setUsers(prev => prev.map(p => p.id===u.id ? updated : p));
+                                    }} style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontWeight: 700, fontSize: "11px", padding: "0 2px" }}>⚡</button>
+                                  </div>
+                                ))}
+                              </div>
+                              {done.length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                                  {done.map(u => { const p = u.knockoutPredictions[m.id]; return (
+                                    <span key={u.id} style={{ fontSize: "11px", background: "var(--green-light)", borderRadius: "99px", padding: "2px 8px", color: "var(--green)", fontWeight: 600 }}>
+                                      {u.name}: {p.homeScore}–{p.awayScore}{p.goesToPens?` P:${p.penWinner}`:""}
+                                    </span>
+                                  );})}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>✅ All {done.length} players predicted</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}
