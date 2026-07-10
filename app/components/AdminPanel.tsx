@@ -2298,8 +2298,8 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
           const correctResult = pr===ar;
           const isEarly = matchId.startsWith("r32-")||matchId.startsWith("r16-");
           const isLate = matchId.startsWith("qf-")||matchId.startsWith("sf-")||matchId.startsWith("final-");
-          if (isEarly) { if (exactScore) pts+=POINTS.EARLY_KO_CORRECT_SCORE; else if (correctResult) pts+=POINTS.EARLY_KO_CORRECT_RESULT; }
-          if (isLate) { if (exactScore) pts+=POINTS.LATE_KO_CORRECT_SCORE; else if (correctResult) pts+=POINTS.LATE_KO_CORRECT_RESULT; }
+          if (isEarly) { if (exactScore) pts+=POINTS.EARLY_KO_CORRECT_SCORE; if (correctResult) pts+=POINTS.EARLY_KO_CORRECT_RESULT; }
+          if (isLate) { if (exactScore) pts+=POINTS.LATE_KO_CORRECT_SCORE; if (correctResult) pts+=POINTS.LATE_KO_CORRECT_RESULT; }
           // ET
           if (actual.wentToET && pred.goesToET && ph===pa) {
             pts+=POINTS.PREDICTS_ET;

@@ -271,10 +271,10 @@ export function calculatePlayerPoints(player: Player, adminState: AdminState): {
 
       if (isEarly) {
         if (exactScore) add("KO correct scores (R32/R16)", POINTS.EARLY_KO_CORRECT_SCORE);
-        else if (correctResult) add("KO correct results (R32/R16)", POINTS.EARLY_KO_CORRECT_RESULT);
+        if (correctResult) add("KO correct results (R32/R16)", POINTS.EARLY_KO_CORRECT_RESULT);
       } else if (isLate) {
         if (exactScore) add("KO correct scores (QF/SF/Final)", POINTS.LATE_KO_CORRECT_SCORE);
-        else if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
+        if (correctResult) add("KO correct results (QF/SF/Final)", POINTS.LATE_KO_CORRECT_RESULT);
       }
 
     // ET/pens — only score these if admin has entered a real result (valid scores exist)
