@@ -412,7 +412,7 @@ export default function HomeScreen({ player, league, onNav, onUpdate, onLogout, 
             const TV: Record<string,string> = {
               "sf-101":"ITV","sf-102":"BBC","3rd-103":"BBC","final-104":"ITV",
             };
-            const roundLabel: Record<string,string> = { sf:"Semi Finals", "3rd":"3rd Place", final:"🏆 Final" };
+            const roundLabel: Record<string,string> = { sf:"Semi Finals", "3rd":"3rd Place Play-off", final:"🏆 Final" };
             const rounds = [
               { key:"sf", matches: KNOCKOUT_MATCHES.sf||[] },
               { key:"3rd", matches: (KNOCKOUT_MATCHES as Record<string,typeof KNOCKOUT_MATCHES["sf"]>)["3rd"]||[] },
