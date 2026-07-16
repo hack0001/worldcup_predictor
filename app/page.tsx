@@ -270,7 +270,8 @@ export default function App() {
       if (nextId === "3rd-103") {
         const loser1 = w1.winner ? (w1.winner === w1.home ? w1.away : w1.home) : "";
         const loser2 = w2.winner ? (w2.winner === w2.home ? w2.away : w2.home) : "";
-        teams[nextId] = { home: stored?.homeTeam || loser1, away: stored?.awayTeam || loser2 };
+        // Always derive from SF results — never use stale stored names
+        teams[nextId] = { home: loser1 || stored?.homeTeam || "", away: loser2 || stored?.awayTeam || "" };
       } else {
         teams[nextId] = { home: stored?.homeTeam || w1.winner || "", away: stored?.awayTeam || w2.winner || "" };
       }

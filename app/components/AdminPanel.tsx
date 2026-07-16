@@ -96,7 +96,9 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
     for (const [id, ct] of Object.entries(confirmedTeams)) {
       if (!ct.home || !ct.away) continue;
       const existing = newKO[id];
-      if (!existing?.homeTeam || !existing?.awayTeam) {
+      // For 3rd place, always overwrite since it was often saved with wrong teams
+      const needs3rdUpdate = id === "3rd-103" && (existing?.homeTeam !== ct.home || existing?.awayTeam !== ct.away);
+      if (!existing?.homeTeam || !existing?.awayTeam || needs3rdUpdate) {
         newKO[id] = { ...(existing || { ...EMPTY_KO_RESULT }), homeTeam: ct.home, awayTeam: ct.away };
         changed = true;
       }
