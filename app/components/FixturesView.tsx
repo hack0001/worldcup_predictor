@@ -43,7 +43,7 @@ export default function FixturesView({ player, confirmedTeams={} }: Props) {
   const byDate: Record<string, typeof upcoming> = {};
   upcoming.forEach(m => { if (!byDate[m.dateUK]) byDate[m.dateUK]=[]; byDate[m.dateUK].push(m); });
 
-  const roundLabel: Record<string,string> = { qf:"Quarter Final", sf:"Semi Final", final:"🏆 Final", "3rd":"3rd Place" };
+  const roundLabel: Record<string,string> = { qf:"Quarter Final", sf:"Semi Final", final:"🏆 Final", "3rd":"3rd Place Play-off" };
 
   return (
     <div style={{ display:"grid", gap:"20px" }}>
