@@ -2343,6 +2343,45 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             <p style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "16px" }}>
               Full knockout audit — recalculates live. Points column per match, totals at bottom.
             </p>
+
+            {/* Crosscheck summary */}
+            <div className="card" style={{ padding: "12px 14px", marginBottom: "14px", borderLeft: "3px solid #8b5cf6" }}>
+              <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>✅ Points Crosscheck — All Players</p>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border)", color: "var(--text-3)", fontSize: "10px" }}>
+                    <th style={{ padding: "4px 8px", textAlign: "left" }}>Player</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>Pre-KO</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>KO</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>Total</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>KO matches scored</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map(({ player, total, breakdown, preKO }) => {
+                    const koTotal = total - preKO;
+                    const koKeys = Object.keys(breakdown).filter(k => k.includes("KO") || k.includes("qualifier") || k.includes("finalist") || k.includes("Predicts") || k.includes("ET") || k.includes("pen"));
+                    const koBreakdownTotal = koKeys.reduce((s, k) => s + breakdown[k], 0);
+                    const mismatch = Math.abs(koTotal - koBreakdownTotal) > 0;
+                    return (
+                      <tr key={player.id} style={{ borderBottom: "1px solid var(--border)", background: mismatch ? "#fef3c7" : "transparent" }}>
+                        <td style={{ padding: "4px 8px", fontWeight: 600 }}>{player.name}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center" }}>{preKO}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center", color: "var(--green)", fontWeight: 700 }}>+{koTotal}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center", fontWeight: 900 }}>{total}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "10px", color: "var(--text-3)" }}>
+                          {completedKO.length} matches · {koKeys.map(k => `+${breakdown[k]} ${k}`).join(", ") || "—"}
+                        </td>
+                        <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                          {mismatch ? <span style={{ color: "#ef4444", fontWeight: 700 }}>⚠️ CHECK</span> : <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ OK</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             <div style={{ display: "flex", gap: "8px", marginBottom: "12px", alignItems: "center" }}>
               <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={async () => {
                 const fresh = await getPlayers();

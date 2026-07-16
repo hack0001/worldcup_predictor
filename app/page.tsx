@@ -265,12 +265,15 @@ export default function App() {
       const [feed1, feed2] = feedStr.split(",");
       const w1 = getWinner(feed1);
       const w2 = getWinner(feed2);
-      // Use stored names if admin already set them, else derive from winners
       const stored = kr[nextId];
-      teams[nextId] = {
-        home: stored?.homeTeam || w1.winner || "",
-        away: stored?.awayTeam || w2.winner || "",
-      };
+      // 3rd place uses losers of semis, not winners
+      if (nextId === "3rd-103") {
+        const loser1 = w1.winner ? (w1.winner === w1.home ? w1.away : w1.home) : "";
+        const loser2 = w2.winner ? (w2.winner === w2.home ? w2.away : w2.home) : "";
+        teams[nextId] = { home: stored?.homeTeam || loser1, away: stored?.awayTeam || loser2 };
+      } else {
+        teams[nextId] = { home: stored?.homeTeam || w1.winner || "", away: stored?.awayTeam || w2.winner || "" };
+      }
     }
 
     return teams;
