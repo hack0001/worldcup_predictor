@@ -1244,14 +1244,41 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
                 <button className="btn-secondary" onClick={() => setViewingUser(null)} style={{ fontSize: "12px" }}>← Back to users</button>
               </div>
 
-              {/* Bonus predictions */}
+              {/* Bonus predictions — editable */}
               <div className="card" style={{ padding: "14px", marginBottom: "12px" }}>
-                <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "10px" }}>🎯 Bonus Predictions</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "13px" }}>
-                  <div><span style={{ color: "var(--text-3)" }}>Golden Boot:</span> <strong>{viewingUser.topScorer || "—"}</strong></div>
-                  <div><span style={{ color: "var(--text-3)" }}>Top Assist:</span> <strong>{viewingUser.topAssist || "—"}</strong></div>
-                  <div><span style={{ color: "var(--text-3)" }}>Tournament Winner:</span> <strong>{viewingUser.tournamentWinner || "—"}</strong></div>
-                  <div><span style={{ color: "var(--text-3)" }}>Player of Tournament:</span> <strong>{viewingUser.playerOfTournament || "—"}</strong></div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <p style={{ fontWeight: 700, fontSize: "13px" }}>🎯 Bonus Predictions</p>
+                  <button className="btn-primary" style={{ fontSize: "11px", padding: "4px 10px" }} onClick={async () => {
+                    await savePlayer(viewingUser);
+                    setUsers(prev => prev.map(u => u.id === viewingUser.id ? viewingUser : u));
+                    alert("Bonus predictions saved!");
+                  }}>✓ Save</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
+                  {[
+                    { label: "⚽ Golden Boot", field: "topScorer" as const, correct: adminState.topScorer },
+                    { label: "🅰️ Top Assist", field: "topAssist" as const, correct: adminState.topAssist },
+                    { label: "🏆 Tournament Winner", field: "tournamentWinner" as const, correct: adminState.tournamentWinner },
+                    { label: "⭐ Player of Tournament", field: "playerOfTournament" as const, correct: adminState.playerOfTournament },
+                  ].map(({ label, field, correct }) => {
+                    const val = viewingUser[field] || "";
+                    const isCorrect = correct && val && val.toLowerCase() === correct.toLowerCase();
+                    const isWrong = correct && val && !isCorrect;
+                    return (
+                      <div key={field}>
+                        <p style={{ fontSize: "10px", color: "var(--text-3)", marginBottom: "3px" }}>{label}</p>
+                        <input type="text"
+                          value={val}
+                          onChange={e => setViewingUser(u => u ? { ...u, [field]: e.target.value } : u)}
+                          style={{ width: "100%", fontSize: "12px", padding: "5px 8px", boxSizing: "border-box" as React.CSSProperties["boxSizing"], borderColor: isCorrect ? "var(--green)" : isWrong ? "#ef4444" : undefined }}
+                          placeholder="Enter name..."
+                        />
+                        {correct && <p style={{ fontSize: "10px", marginTop: "2px", color: isCorrect ? "var(--green)" : "var(--text-3)" }}>
+                          {isCorrect ? "✓ Correct" : `Answer: ${correct}`}
+                        </p>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
