@@ -2349,34 +2349,74 @@ export default function AdminPanel({ adminState, onUpdate, onClose, currentPlaye
             {/* Crosscheck summary */}
             <div className="card" style={{ padding: "12px 14px", marginBottom: "14px", borderLeft: "3px solid #8b5cf6" }}>
               <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "8px" }}>✅ Points Crosscheck — All Players</p>
+
+            {/* Bonus answers confirmed */}
+            <div className="card" style={{ padding: "12px 14px", marginBottom: "12px", borderLeft: "3px solid #f59e0b" }}>
+              <p style={{ fontWeight: 700, fontSize: "12px", marginBottom: "6px" }}>🏆 Official Tournament Awards (admin-entered)</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                {[
+                  { label: "Tournament Winner", value: adminState.tournamentWinner, pts: "40pts", confirmed: "Spain" },
+                  { label: "Golden Boot", value: adminState.topScorer, pts: "20pts", confirmed: "Kylian Mbappe" },
+                  { label: "Top Assist", value: adminState.topAssist, pts: "15pts", confirmed: "Michael Olise" },
+                  { label: "Player of Tournament", value: adminState.playerOfTournament, pts: "20pts", confirmed: "Rodri" },
+                ].map(({ label, value, pts, confirmed }) => {
+                  const match = value?.toLowerCase().includes(confirmed.split(" ").pop()!.toLowerCase());
+                  return (
+                    <div key={label} style={{ padding: "6px 8px", background: "var(--surface2)", borderRadius: "6px", borderLeft: `2px solid ${value ? (match ? "var(--green)" : "#ef4444") : "#d1d5db"}` }}>
+                      <p style={{ fontSize: "10px", color: "var(--text-3)", marginBottom: "2px" }}>{label} · {pts}</p>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: value ? (match ? "var(--green)" : "#ef4444") : "var(--text-3)" }}>
+                        {value || "⚠️ NOT SET"} {value && !match && `(expected: ${confirmed})`}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              {(!adminState.tournamentWinner || !adminState.topScorer || !adminState.topAssist || !adminState.playerOfTournament) && (
+                <p style={{ fontSize: "11px", color: "#ef4444", marginTop: "8px", fontWeight: 600 }}>⚠️ Some bonus answers not set — go to Match Results → Awards and enter them</p>
+              )}
+            </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid var(--border)", color: "var(--text-3)", fontSize: "10px" }}>
                     <th style={{ padding: "4px 8px", textAlign: "left" }}>Player</th>
                     <th style={{ padding: "4px 6px", textAlign: "center" }}>Pre-KO</th>
                     <th style={{ padding: "4px 6px", textAlign: "center" }}>KO</th>
+                    <th style={{ padding: "4px 6px", textAlign: "center" }}>Bonus</th>
                     <th style={{ padding: "4px 6px", textAlign: "center" }}>Total</th>
-                    <th style={{ padding: "4px 6px", textAlign: "center" }}>KO matches scored</th>
+                    <th style={{ padding: "4px 6px", textAlign: "left" }}>Bonus picks</th>
                     <th style={{ padding: "4px 6px", textAlign: "center" }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {leaderboard.map(({ player, total, breakdown, preKO }) => {
                     const koTotal = total - preKO;
-                    const koKeys = Object.keys(breakdown).filter(k => k.includes("KO") || k.includes("qualifier") || k.includes("finalist") || k.includes("Predicts") || k.includes("ET") || k.includes("pen"));
-                    const koBreakdownTotal = koKeys.reduce((s, k) => s + breakdown[k], 0);
-                    const mismatch = Math.abs(koTotal - koBreakdownTotal) > 0;
+                    const bonusKeys = ["Golden Boot","Top Assist","Player of Tournament","Tournament Winner"];
+                    const bonusPts = bonusKeys.reduce((s,k) => s + (breakdown[k]||0), 0);
+                    const wonBoot = adminState.topScorer && player.topScorer === adminState.topScorer;
+                    const wonAssist = adminState.topAssist && player.topAssist === adminState.topAssist;
+                    const wonPott = adminState.playerOfTournament && player.playerOfTournament === adminState.playerOfTournament;
+                    const wonWinner = adminState.tournamentWinner && player.tournamentWinner === adminState.tournamentWinner;
+                    const expectedBonus = (wonBoot?20:0)+(wonAssist?15:0)+(wonPott?20:0)+(wonWinner?40:0);
+                    const mismatch = Math.abs(bonusPts - expectedBonus) > 0;
                     return (
                       <tr key={player.id} style={{ borderBottom: "1px solid var(--border)", background: mismatch ? "#fef3c7" : "transparent" }}>
                         <td style={{ padding: "4px 8px", fontWeight: 600 }}>{player.name}</td>
-                        <td style={{ padding: "4px 6px", textAlign: "center" }}>{preKO}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center" }}>{preKO - bonusPts}</td>
                         <td style={{ padding: "4px 6px", textAlign: "center", color: "var(--green)", fontWeight: 700 }}>+{koTotal}</td>
-                        <td style={{ padding: "4px 6px", textAlign: "center", fontWeight: 900 }}>{total}</td>
-                        <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "10px", color: "var(--text-3)" }}>
-                          {completedKO.length} matches · {koKeys.map(k => `+${breakdown[k]} ${k}`).join(", ") || "—"}
+                        <td style={{ padding: "4px 6px", textAlign: "center", color: bonusPts > 0 ? "#f59e0b" : "var(--text-3)", fontWeight: 700 }}>{bonusPts > 0 ? `+${bonusPts}` : "0"}</td>
+                        <td style={{ padding: "4px 6px", textAlign: "center", fontWeight: 900, fontSize: "13px" }}>{total}</td>
+                        <td style={{ padding: "4px 6px", fontSize: "10px", color: "var(--text-3)" }}>
+                          {wonWinner && "🏆 "}{wonBoot && "⚽ "}{wonAssist && "🅰️ "}{wonPott && "⭐ "}
+                          {!wonWinner && !wonBoot && !wonAssist && !wonPott ? "none correct" : ""}
+                          <span style={{ opacity: 0.7 }}>
+                            {player.tournamentWinner ? `W:${player.tournamentWinner} ` : ""}
+                            {player.topScorer ? `GB:${player.topScorer} ` : ""}
+                            {player.topAssist ? `A:${player.topAssist} ` : ""}
+                            {player.playerOfTournament ? `P:${player.playerOfTournament}` : ""}
+                          </span>
                         </td>
                         <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                          {mismatch ? <span style={{ color: "#ef4444", fontWeight: 700 }}>⚠️ CHECK</span> : <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ OK</span>}
+                          {mismatch ? <span style={{ color: "#ef4444", fontWeight: 700 }}>⚠️</span> : <span style={{ color: "var(--green)", fontWeight: 700 }}>✓</span>}
                         </td>
                       </tr>
                     );
